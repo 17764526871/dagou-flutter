@@ -21,11 +21,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   double _topP = 0.95;
   int _maxTokens = 8192;
 
-  // 语音设置
-  bool _enableTts = true;
-  bool _autoPlayTts = false;
-  String _ttsLanguage = 'zh-CN';
-
   // 翻译设置
   bool _enableTranslation = false;
   String _translationMode = 'zh-en'; // zh-en, en-zh, auto
@@ -51,11 +46,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _topP = modelParams['topP'];
       _maxTokens = modelParams['maxTokens'];
 
-      final ttsSettings = SettingsService.instance.loadTtsSettings();
-      _enableTts = ttsSettings['enableTts'];
-      _autoPlayTts = ttsSettings['autoPlay'];
-      _ttsLanguage = ttsSettings['language'];
-
       final translationSettings = SettingsService.instance.loadTranslationSettings();
       _enableTranslation = translationSettings['enable'];
       _translationMode = translationSettings['mode'];
@@ -72,6 +62,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.dispose();
   }
 
+  void _showTopSnackBar(String message, {Color? backgroundColor}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: backgroundColor ?? const Color(0xFF48BB78),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.only(
+          top: MediaQuery.of(context).padding.top + 16,
+          left: 16,
+          right: 16,
+          bottom: MediaQuery.of(context).size.height - 100,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
+
   Future<void> _saveSettings() async {
     await SettingsService.instance.saveSystemPrompt(_systemPromptController.text);
     await SettingsService.instance.saveModelParams(
@@ -79,11 +89,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       topK: _topK,
       topP: _topP,
       maxTokens: _maxTokens,
-    );
-    await SettingsService.instance.saveTtsSettings(
-      enableTts: _enableTts,
-      autoPlay: _autoPlayTts,
-      language: _ttsLanguage,
     );
     await SettingsService.instance.saveTranslationSettings(
       enable: _enableTranslation,
@@ -95,13 +100,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('设置已保存'),
-          backgroundColor: Color(0xFF48BB78),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      _showTopSnackBar('设置已保存');
       Navigator.pop(context);
     }
   }
@@ -129,12 +128,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await SettingsService.instance.resetToDefaults();
       await _loadSettings();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('设置已重置'),
-            backgroundColor: Color(0xFF48BB78),
-          ),
-        );
+        _showTopSnackBar('设置已重置');
       }
     }
   }
@@ -166,11 +160,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (confirm == true) {
       final success = await CacheService.instance.clearAllCache();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(success ? '缓存已清除' : '清除缓存失败'),
-            backgroundColor: success ? const Color(0xFF48BB78) : const Color(0xFFF56565),
-          ),
+        _showTopSnackBar(
+          success ? '缓存已清除' : '清除缓存失败',
+          backgroundColor: success ? const Color(0xFF48BB78) : const Color(0xFFF56565),
         );
       }
     }
@@ -337,34 +329,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 16),
 
           _buildSection(
-            title: '语音设置',
-            children: [
-              _buildSwitch(
-                label: '启用语音播报',
-                value: _enableTts,
-                onChanged: (value) => setState(() => _enableTts = value),
-                description: '允许 AI 回复语音播报',
-              ),
-              _buildSwitch(
-                label: '自动播报',
-                value: _autoPlayTts,
-                onChanged: (value) => setState(() => _autoPlayTts = value),
-                description: 'AI 回复后自动播报',
-              ),
-              _buildDropdown(
-                label: '播报语言',
-                value: _ttsLanguage,
-                items: const [
-                  {'value': 'zh-CN', 'label': '中文'},
-                  {'value': 'en-US', 'label': 'English'},
-                ],
-                onChanged: (value) => setState(() => _ttsLanguage = value!),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          _buildSection(
             title: '高级设置',
             children: [
               _buildDropdown(
@@ -381,12 +345,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     await ModelManager.instance.switchModel(currentModelId, backend: backend);
                     setState(() {});
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('已切换到 ${value == 'gpu' ? 'GPU' : 'CPU'} 后端'),
-                          backgroundColor: const Color(0xFF48BB78),
-                        ),
-                      );
+                      _showTopSnackBar('已切换到 ${value == 'gpu' ? 'GPU' : 'CPU'} 后端');
                     }
                   }
                 },

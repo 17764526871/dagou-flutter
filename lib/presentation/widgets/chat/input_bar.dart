@@ -5,6 +5,7 @@ import '../../../services/audio/audio_service.dart';
 class InputBar extends StatefulWidget {
   final TextEditingController controller;
   final VoidCallback onSend;
+  final VoidCallback? onCancel;
   final Function(String, int) onVoiceRecorded;
   final VoidCallback onCameraPick;
   final VoidCallback onImagePick;
@@ -14,6 +15,7 @@ class InputBar extends StatefulWidget {
     super.key,
     required this.controller,
     required this.onSend,
+    this.onCancel,
     required this.onVoiceRecorded,
     required this.onCameraPick,
     required this.onImagePick,
@@ -24,14 +26,12 @@ class InputBar extends StatefulWidget {
   State<InputBar> createState() => _InputBarState();
 }
 
-class _InputBarState extends State<InputBar>
-    with TickerProviderStateMixin {
+class _InputBarState extends State<InputBar> with TickerProviderStateMixin {
   bool _isVoiceMode = false;
   bool _isRecording = false;
   bool _isCancelZone = false;
   bool _showMoreMenu = false;
 
-  // 音频可视化数据
   final List<double> _audioLevels = List.filled(15, 0.0);
   Timer? _audioTimer;
   int _recordingSeconds = 0;
@@ -61,7 +61,6 @@ class _InputBarState extends State<InputBar>
       _recordingSeconds = 0;
     });
 
-    // 开始录音计时
     _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
         setState(() {
@@ -70,12 +69,10 @@ class _InputBarState extends State<InputBar>
       }
     });
 
-    // 音频可视化（使用真实音量数据）
     _audioTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) async {
       if (mounted && _isRecording) {
         final amplitude = await AudioService.instance.getAmplitude();
         setState(() {
-          // 更新波形，从右向左移动
           for (int i = 0; i < _audioLevels.length - 1; i++) {
             _audioLevels[i] = _audioLevels[i + 1];
           }
@@ -119,52 +116,46 @@ class _InputBarState extends State<InputBar>
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
+        border: Border(
+          top: BorderSide(
+            color: const Color(0xFFE2E8F0),
+            width: 0.5,
           ),
-        ],
+        ),
       ),
       child: SafeArea(
         top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 录音提示覆盖层
             if (_isRecording) _buildRecordingOverlay(),
-
-            // 主输入区域
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  // 语音/键盘切换按钮
-                  _buildIconButton(
-                    icon: _isVoiceMode ? Icons.keyboard : Icons.mic,
-                    onTap: () {
-                      setState(() {
-                        _isVoiceMode = !_isVoiceMode;
-                        _showMoreMenu = false;
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 8),
-
-                  // 中间输入区域
+                  if (!widget.isSending) ...[
+                    _buildActionButton(
+                      icon: _isVoiceMode ? Icons.keyboard : Icons.mic,
+                      onTap: () {
+                        setState(() {
+                          _isVoiceMode = !_isVoiceMode;
+                          _showMoreMenu = false;
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   Expanded(
-                    child: _isVoiceMode
-                        ? _buildVoiceButton()
-                        : _buildTextInput(),
+                    child: widget.isSending
+                        ? _buildSendingIndicator()
+                        : (_isVoiceMode ? _buildVoiceButton() : _buildTextInput()),
                   ),
-
                   const SizedBox(width: 8),
-
-                  // 右侧功能按钮
-                  if (!_isVoiceMode && widget.controller.text.trim().isEmpty)
-                    _buildIconButton(
+                  if (widget.isSending)
+                    _buildCancelButton()
+                  else if (!_isVoiceMode && widget.controller.text.trim().isEmpty)
+                    _buildActionButton(
                       icon: Icons.add_circle_outline,
                       onTap: () {
                         setState(() {
@@ -177,8 +168,6 @@ class _InputBarState extends State<InputBar>
                 ],
               ),
             ),
-
-            // 更多功能菜单
             if (_showMoreMenu) _buildMoreMenu(),
           ],
         ),
@@ -186,24 +175,21 @@ class _InputBarState extends State<InputBar>
     );
   }
 
-  Widget _buildIconButton({
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF7FAFC),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Icon(
-          icon,
-          size: 22,
-          color: const Color(0xFF0EA5E9),
+  Widget _buildActionButton({required IconData icon, required VoidCallback onTap}) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          width: 40,
+          height: 40,
+          alignment: Alignment.center,
+          child: Icon(
+            icon,
+            size: 24,
+            color: const Color(0xFF64748B),
+          ),
         ),
       ),
     );
@@ -212,40 +198,116 @@ class _InputBarState extends State<InputBar>
   Widget _buildTextInput() {
     return Container(
       constraints: const BoxConstraints(
-        minHeight: 36,
+        minHeight: 40,
         maxHeight: 120,
       ),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7FAFC),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: const Color(0xFFE2E8F0),
-          width: 1,
-        ),
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: TextField(
         controller: widget.controller,
         decoration: const InputDecoration(
           hintText: '输入消息...',
           hintStyle: TextStyle(
-            color: Color(0xFFA0AEC0),
+            color: Color(0xFF94A3B8),
             fontSize: 15,
           ),
           border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 8,
-          ),
+          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         ),
         maxLines: null,
-        style: const TextStyle(fontSize: 15),
+        style: const TextStyle(fontSize: 15, color: Color(0xFF1E293B)),
         textInputAction: TextInputAction.send,
         onChanged: (_) => setState(() {}),
         onSubmitted: (_) {
-          if (widget.controller.text.trim().isNotEmpty && !widget.isSending) {
+          if (widget.controller.text.trim().isNotEmpty) {
             widget.onSend();
           }
         },
+      ),
+    );
+  }
+
+  Widget _buildSendingIndicator() {
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                const Color(0xFF0EA5E9),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Text(
+            '生成中...',
+            style: TextStyle(
+              fontSize: 15,
+              color: Color(0xFF64748B),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCancelButton() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: widget.onCancel,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFEF2F2),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Text(
+            '取消',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFFEF4444),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSendButton() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: widget.onSend,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
+            ),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Icon(
+            Icons.send_rounded,
+            size: 20,
+            color: Colors.white,
+          ),
+        ),
       ),
     );
   }
@@ -256,18 +318,12 @@ class _InputBarState extends State<InputBar>
       onLongPressEnd: (_) => _stopRecording(),
       onLongPressMoveUpdate: _onVerticalDragUpdate,
       child: Container(
-        height: 36,
+        height: 40,
         decoration: BoxDecoration(
           color: _isRecording
-              ? (_isCancelZone ? const Color(0xFFF56565) : const Color(0xFF0EA5E9))
-              : const Color(0xFFF7FAFC),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: _isRecording
-                ? (_isCancelZone ? const Color(0xFFF56565) : const Color(0xFF0EA5E9))
-                : const Color(0xFFE2E8F0),
-            width: _isRecording ? 2 : 1,
-          ),
+              ? (_isCancelZone ? const Color(0xFFFEE2E2) : const Color(0xFFDCFCE7))
+              : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(20),
         ),
         alignment: Alignment.center,
         child: Text(
@@ -276,34 +332,11 @@ class _InputBarState extends State<InputBar>
               : '按住说话',
           style: TextStyle(
             fontSize: 15,
-            color: _isRecording ? Colors.white : const Color(0xFF0EA5E9),
-            fontWeight: _isRecording ? FontWeight.w600 : FontWeight.normal,
+            fontWeight: FontWeight.w500,
+            color: _isRecording
+                ? (_isCancelZone ? const Color(0xFFEF4444) : const Color(0xFF10B981))
+                : const Color(0xFF64748B),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSendButton() {
-    return InkWell(
-      onTap: widget.isSending ? null : widget.onSend,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          gradient: widget.isSending
-              ? null
-              : const LinearGradient(
-                  colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
-                ),
-          color: widget.isSending ? const Color(0xFFE2E8F0) : null,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Icon(
-          widget.isSending ? Icons.hourglass_empty : Icons.send_rounded,
-          size: 18,
-          color: Colors.white,
         ),
       ),
     );
@@ -311,86 +344,58 @@ class _InputBarState extends State<InputBar>
 
   Widget _buildRecordingOverlay() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+      padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.95),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(
+            color: const Color(0xFFE2E8F0),
+            width: 0.5,
           ),
-        ],
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 音频波形可视化
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: List.generate(_audioLevels.length, (index) {
-              final height = 12.0 + _audioLevels[index] * 36;
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 100),
-                curve: Curves.easeOut,
-                width: 4,
-                height: height,
-                margin: const EdgeInsets.symmetric(horizontal: 3),
-                decoration: BoxDecoration(
-                  gradient: _isCancelZone
-                      ? const LinearGradient(
-                          colors: [Color(0xFFF56565), Color(0xFFFC8181)],
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                        )
-                      : const LinearGradient(
-                          colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                        ),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              );
-            }),
+          Icon(
+            _isCancelZone ? Icons.cancel_outlined : Icons.mic,
+            size: 32,
+            color: _isCancelZone ? const Color(0xFFEF4444) : const Color(0xFF10B981),
           ),
-          const SizedBox(height: 20),
-
-          // 录音时长
+          const SizedBox(height: 8),
           Text(
-            _formatDuration(_recordingSeconds),
-            style: const TextStyle(
-              fontSize: 24,
-              color: Color(0xFF2D3748),
-              fontWeight: FontWeight.w600,
-              letterSpacing: 1.2,
+            _isCancelZone ? '松开取消发送' : '上滑取消',
+            style: TextStyle(
+              fontSize: 13,
+              color: _isCancelZone ? const Color(0xFFEF4444) : const Color(0xFF64748B),
             ),
           ),
           const SizedBox(height: 12),
-
-          // 提示文字
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                _isCancelZone ? Icons.cancel_outlined : Icons.arrow_upward_rounded,
-                size: 16,
-                color: _isCancelZone
-                    ? const Color(0xFFF56565)
-                    : const Color(0xFF718096),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                _isCancelZone ? '松开取消发送' : '上滑取消',
-                style: TextStyle(
-                  fontSize: 14,
+            children: List.generate(
+              _audioLevels.length,
+              (index) => Container(
+                width: 3,
+                height: 20 + (_audioLevels[index] * 30),
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                decoration: BoxDecoration(
                   color: _isCancelZone
-                      ? const Color(0xFFF56565)
-                      : const Color(0xFF718096),
-                  fontWeight: FontWeight.w500,
+                      ? const Color(0xFFEF4444)
+                      : const Color(0xFF10B981),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-            ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${_recordingSeconds ~/ 60}:${(_recordingSeconds % 60).toString().padLeft(2, '0')}',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF1E293B),
+            ),
           ),
         ],
       ),
@@ -400,19 +405,26 @@ class _InputBarState extends State<InputBar>
   Widget _buildMoreMenu() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(
+            color: Color(0xFFE2E8F0),
+            width: 0.5,
+          ),
+        ),
+      ),
       child: Row(
         children: [
           _buildMenuButton(
-            icon: Icons.image_rounded,
+            icon: Icons.photo_library_outlined,
             label: '相册',
-            color: const Color(0xFF0EA5E9),
             onTap: widget.onImagePick,
           ),
           const SizedBox(width: 24),
           _buildMenuButton(
-            icon: Icons.camera_alt_rounded,
+            icon: Icons.camera_alt_outlined,
             label: '拍照',
-            color: const Color(0xFF48BB78),
             onTap: widget.onCameraPick,
           ),
         ],
@@ -423,44 +435,32 @@ class _InputBarState extends State<InputBar>
   Widget _buildMenuButton({
     required IconData icon,
     required String label,
-    required Color color,
     required VoidCallback onTap,
   }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 20, color: const Color(0xFF64748B)),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF64748B),
+              ),
             ),
-            child: Icon(
-              icon,
-              size: 28,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Color(0xFF718096),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
-  }
-
-  String _formatDuration(int seconds) {
-    final minutes = seconds ~/ 60;
-    final secs = seconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 }

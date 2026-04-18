@@ -15,6 +15,7 @@ class _LoadingScreenState extends State<LoadingScreen>
   String _statusMessage = '正在初始化...';
   double _progress = 0.0;
   late AnimationController _pulseController;
+  late AnimationController _progressController;
 
   @override
   void initState() {
@@ -24,12 +25,18 @@ class _LoadingScreenState extends State<LoadingScreen>
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
 
+    _progressController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 10),
+    );
+
     _initializeApp();
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
+    _progressController.dispose();
     super.dispose();
   }
 
@@ -55,11 +62,29 @@ class _LoadingScreenState extends State<LoadingScreen>
         _progress = 0.4;
       });
 
-      // 模拟进度更新
-      _simulateProgress(0.4, 0.85, 10000); // 10秒内从40%到85%
+      // 使用动画控制器平滑更新进度
+      final animation = Tween<double>(begin: 0.4, end: 0.85).animate(
+        CurvedAnimation(
+          parent: _progressController,
+          curve: Curves.easeInOut,
+        ),
+      );
+
+      animation.addListener(() {
+        if (mounted) {
+          setState(() {
+            _progress = animation.value;
+          });
+        }
+      });
+
+      _progressController.forward();
 
       // 实际初始化
       await AIService.instance.initialize();
+
+      // 停止动画
+      _progressController.stop();
 
       // 步骤 4: 配置参数
       setState(() {
@@ -124,22 +149,6 @@ class _LoadingScreenState extends State<LoadingScreen>
           ),
         );
       }
-    }
-  }
-
-  void _simulateProgress(double start, double end, int durationMs) {
-    final steps = 20;
-    final stepDuration = durationMs ~/ steps;
-    final increment = (end - start) / steps;
-
-    for (int i = 0; i < steps; i++) {
-      Future.delayed(Duration(milliseconds: stepDuration * i), () {
-        if (mounted && _progress < end) {
-          setState(() {
-            _progress = start + (increment * (i + 1));
-          });
-        }
-      });
     }
   }
 

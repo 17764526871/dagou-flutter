@@ -15,6 +15,7 @@ class AIService {
   int _topK = 64;
   double _topP = 0.95;
   int _maxTokens = 8192;
+  String? _currentSystemPrompt; // 记录当前系统提示词
 
   bool get isInitialized => _isInitialized;
 
@@ -123,18 +124,22 @@ class AIService {
     }
 
     try {
-      // 如果提供了新的模型参数或系统提示词，需要重新创建聊天会话
-      final needRecreate = temperature != null ||
-                          topK != null ||
-                          topP != null ||
-                          maxTokens != null ||
-                          systemPrompt != null;
+      // 检查参数是否真正改变
+      final tempChanged = temperature != null && temperature != _temperature;
+      final topKChanged = topK != null && topK != _topK;
+      final topPChanged = topP != null && topP != _topP;
+      final maxTokensChanged = maxTokens != null && maxTokens != _maxTokens;
+      final systemPromptChanged = systemPrompt != _currentSystemPrompt;
+
+      final needRecreate = tempChanged || topKChanged || topPChanged ||
+                          maxTokensChanged || systemPromptChanged;
 
       if (needRecreate) {
         _temperature = temperature ?? _temperature;
         _topK = topK ?? _topK;
         _topP = topP ?? _topP;
         _maxTokens = maxTokens ?? _maxTokens;
+        _currentSystemPrompt = systemPrompt;
 
         // 重新创建聊天会话
         final model = await FlutterGemma.getActiveModel(
@@ -222,8 +227,30 @@ class AIService {
     }
   }
 
-  /// 清除聊天历史
-  void clearHistory() {
-    print('💬 聊天历史已清除');
+  /// 清除聊天历史（重新创建会话）
+  Future<void> clearHistory() async {
+    print('💬 清除聊天历史，重新创建会话');
+
+    // 重置当前系统提示词
+    _currentSystemPrompt = null;
+
+    // 重新创建聊天会话
+    final model = await FlutterGemma.getActiveModel(
+      maxTokens: _maxTokens,
+      supportImage: true,
+      maxNumImages: 1,
+      supportAudio: true,
+      preferredBackend: PreferredBackend.gpu,
+    );
+
+    _chat = await model.createChat(
+      temperature: _temperature,
+      topK: _topK,
+      topP: _topP,
+      randomSeed: 42,
+      tokenBuffer: 512,
+      supportImage: true,
+      supportAudio: true,
+    );
   }
 }

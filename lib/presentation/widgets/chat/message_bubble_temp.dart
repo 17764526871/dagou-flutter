@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'dart:typed_data';
-import '../../../data/models/message.dart';
+import '../models/message.dart';
 import 'audio_player_widget.dart';
 
-class MessageBubble extends StatelessWidget {
+class EnhancedMessageBubble extends StatelessWidget {
   final Message message;
   final VoidCallback? onTtsPlay;
   final bool isThinking;
   final bool showTimestamp;
 
-  const MessageBubble({
+  const EnhancedMessageBubble({
     super.key,
     required this.message,
     this.onTtsPlay,
@@ -99,7 +99,6 @@ class MessageBubble extends StatelessWidget {
                                   )
                                 : MarkdownBody(
                                     data: message.text,
-                                    selectable: true,
                                     styleSheet: MarkdownStyleSheet(
                                       p: const TextStyle(
                                         color: Color(0xFF2D3748),
@@ -111,29 +110,14 @@ class MessageBubble extends StatelessWidget {
                                             const Color(0xFFF7FAFC),
                                         color: const Color(0xFF0EA5E9),
                                         fontSize: 14,
-                                        fontFamily: 'monospace',
                                       ),
                                       codeblockDecoration: BoxDecoration(
                                         color: const Color(0xFFF7FAFC),
                                         borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: const Color(0xFFE2E8F0),
-                                          width: 1,
-                                        ),
                                       ),
-                                      codeblockPadding: const EdgeInsets.all(12),
                                       blockquote: const TextStyle(
                                         color: Color(0xFF718096),
                                         fontStyle: FontStyle.italic,
-                                      ),
-                                      blockquotePadding: const EdgeInsets.only(left: 12),
-                                      blockquoteDecoration: BoxDecoration(
-                                        border: Border(
-                                          left: BorderSide(
-                                            color: const Color(0xFF0EA5E9),
-                                            width: 4,
-                                          ),
-                                        ),
                                       ),
                                       h1: const TextStyle(
                                         fontSize: 20,
@@ -152,17 +136,6 @@ class MessageBubble extends StatelessWidget {
                                       ),
                                       listBullet: const TextStyle(
                                         color: Color(0xFF0EA5E9),
-                                      ),
-                                      listIndent: 24,
-                                      a: const TextStyle(
-                                        color: Color(0xFF0EA5E9),
-                                        decoration: TextDecoration.underline,
-                                      ),
-                                      strong: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      em: const TextStyle(
-                                        fontStyle: FontStyle.italic,
                                       ),
                                     ),
                                   ),

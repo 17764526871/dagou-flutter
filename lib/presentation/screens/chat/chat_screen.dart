@@ -92,18 +92,38 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_scrollController.hasClients) {
       final maxScroll = _scrollController.position.maxScrollExtent;
       final currentScroll = _scrollController.position.pixels;
-      setState(() {
-        _userScrolling = currentScroll < maxScroll - 100;
-      });
+      final isNearBottom = maxScroll - currentScroll < 50;
+
+      // 只在流式输出时才自动跟随
+      if (_isSending) {
+        if (isNearBottom && _userScrolling) {
+          setState(() => _userScrolling = false);
+        } else if (currentScroll < maxScroll - 200 && !_userScrolling) {
+          setState(() => _userScrolling = true);
+        }
+      }
     }
   }
 
   @override
   void dispose() {
+    // 取消流订阅
+    _streamSubscription?.cancel();
+    _streamSubscription = null;
+
+    // 释放控制器
     _textController.dispose();
     _scrollController.dispose();
-    _streamSubscription?.cancel();
+
+    // 停止TTS
     _flutterTts.stop();
+
+    // 清理消息列表（释放图片内存）
+    _messages.clear();
+
+    // 清理待发送的图片
+    _pendingImage = null;
+
     super.dispose();
   }
 
@@ -174,6 +194,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _totalCharacters = 0;
       _tokensPerSecond = 0.0;
       _averageLatency = 0.0;
+      _userScrolling = false; // 重置滚动状态
     });
 
     Message userMsg;
@@ -213,8 +234,12 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       }
 
+      // 取消之前的订阅
+      await _streamSubscription?.cancel();
+      _streamSubscription = null;
+
       // 使用流式输出，传递所有参数
-      await for (final chunk in AIService.instance.sendMessageStream(
+      final stream = AIService.instance.sendMessageStream(
         msgText,
         imageBytes: finalImage,
         systemPrompt: finalSystemPrompt,
@@ -222,40 +247,62 @@ class _ChatScreenState extends State<ChatScreen> {
         topK: _topK,
         topP: _topP,
         maxTokens: _maxTokens,
-      )) {
-        if (mounted) {
-          setState(() {
-            _streamingText += chunk;
-            if (_streamingMessageIndex != null) {
-              _messages[_streamingMessageIndex!] =
-                  Message.text(text: _streamingText, isUser: false);
-            }
+      );
 
-            // 更新性能指标
-            _totalTokens++;
-            _totalCharacters = _streamingText.length;
-            if (_inferenceStartTime != null) {
-              final elapsed = DateTime.now().difference(_inferenceStartTime!);
-              _tokensPerSecond = _totalTokens / elapsed.inMilliseconds * 1000;
-              _averageLatency = elapsed.inMilliseconds / _totalTokens;
+      _streamSubscription = stream.listen(
+        (chunk) {
+          if (mounted) {
+            setState(() {
+              _streamingText += chunk;
+              if (_streamingMessageIndex != null) {
+                _messages[_streamingMessageIndex!] =
+                    Message.text(text: _streamingText, isUser: false);
+              }
+
+              // 更新性能指标
+              _totalTokens++;
+              _totalCharacters = _streamingText.length;
+              if (_inferenceStartTime != null) {
+                final elapsed = DateTime.now().difference(_inferenceStartTime!);
+                _tokensPerSecond = _totalTokens / elapsed.inMilliseconds * 1000;
+                _averageLatency = elapsed.inMilliseconds / _totalTokens;
+              }
+            });
+            if (!_userScrolling) {
+              _scrollToBottom();
             }
-          });
-          if (!_userScrolling) {
-            _scrollToBottom();
           }
-        }
-      }
+        },
+        onDone: () {
+          if (mounted) {
+            setState(() {
+              _isSending = false;
+              _streamingMessageIndex = null;
+              _inferenceEndTime = DateTime.now();
+            });
 
-      setState(() {
-        _isSending = false;
-        _streamingMessageIndex = null;
-        _inferenceEndTime = DateTime.now();
-      });
-
-      // 自动播报
-      if (_enableTts && _autoPlayTts && _streamingText.isNotEmpty) {
-        await _playTts(_streamingText);
-      }
+            // 自动播报
+            if (_enableTts && _autoPlayTts && _streamingText.isNotEmpty) {
+              _playTts(_streamingText);
+            }
+          }
+          _streamSubscription = null;
+        },
+        onError: (e) {
+          if (mounted) {
+            setState(() {
+              if (_streamingMessageIndex != null) {
+                _messages[_streamingMessageIndex!] =
+                    Message.text(text: '抱歉，发生了错误：$e', isUser: false);
+              }
+              _isSending = false;
+              _streamingMessageIndex = null;
+            });
+          }
+          _streamSubscription = null;
+        },
+        cancelOnError: true,
+      );
     } catch (e) {
       setState(() {
         if (_streamingMessageIndex != null) {
@@ -279,10 +326,10 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     _scrollToBottom();
 
-    // 直接回复语音消息（暂不支持语音识别）
+    // flutter_gemma 暂不支持音频输入（功能开发中）
     setState(() {
       _messages.add(Message.text(
-        text: '抱歉，当前版本暂不支持语音识别。请使用文字或图片输入。',
+        text: '我已收到你的语音消息。你可以点击播放按钮回放录音。\n\n当前 flutter_gemma 包暂不支持音频识别功能（该功能正在开发中）。请使用文字或图片输入与我交流。',
         isUser: false,
       ));
     });
@@ -304,7 +351,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  void _cancelSending() {
+  Future<void> _cancelSending() async {
     _streamSubscription?.cancel();
     _streamSubscription = null;
 
@@ -321,11 +368,44 @@ class _ChatScreenState extends State<ChatScreen> {
       _streamingMessageIndex = null;
       _streamingText = '';
     });
+
+    // 清除 AI 服务的会话状态，避免继续发送之前的内容
+    await AIService.instance.clearHistory();
+  }
+
+  void _clearMessages() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('清除对话'),
+        content: const Text('确定要清除所有对话记录吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              setState(() {
+                _messages.clear();
+                _addWelcomeMessage();
+              });
+              await AIService.instance.clearHistory();
+            },
+            child: const Text('清除', style: TextStyle(color: Color(0xFFF56565))),
+          ),
+        ],
+      ),
+    );
   }
 
   void _scrollToBottom() {
+    if (_userScrolling) return; // 用户手动滚动时不自动滚动
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
+      if (_scrollController.hasClients && !_userScrolling) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
           duration: const Duration(milliseconds: 200),
@@ -357,6 +437,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
     // 重新初始化 TTS（语言可能已更改）
     await _initTts();
+
+    // 关键修复：清除AI服务的聊天历史，确保新的系统提示词生效
+    await AIService.instance.clearHistory();
   }
 
   @override
@@ -366,21 +449,25 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: _buildAppBar(),
       body: Column(
         children: [
-          // 性能指标栏
+          // 性能指标栏（移到顶部）
           if (_showMetrics && _isSending) _buildMetricsBar(),
 
           // 消息列表
           Expanded(
             child: _messages.isEmpty
                 ? _buildEmptyState()
-                : ListView.builder(
+                : Scrollbar(
                     controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    itemCount: _messages.length,
-                    itemBuilder: (context, index) {
-                      final message = _messages[index];
-                      return MessageBubble(message: message);
-                    },
+                    thickness: 0, // 隐藏滚动条
+                    child: ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      itemCount: _messages.length,
+                      itemBuilder: (context, index) {
+                        final message = _messages[index];
+                        return MessageBubble(message: message);
+                      },
+                    ),
                   ),
           ),
 
@@ -391,7 +478,8 @@ class _ChatScreenState extends State<ChatScreen> {
           // 输入栏
           InputBar(
             controller: _textController,
-            onSend: _isSending ? () {} : () => _sendMessage(),
+            onSend: () => _sendMessage(),
+            onCancel: _cancelSending,
             onVoiceRecorded: _handleVoiceRecorded,
             onCameraPick: () => _pickImage(ImageSource.camera),
             onImagePick: () => _pickImage(ImageSource.gallery),
@@ -453,11 +541,11 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
       actions: [
-        if (_isSending)
+        if (_messages.length > 1)
           IconButton(
-            icon: const Icon(Icons.close, color: Color(0xFFF56565)),
-            onPressed: _cancelSending,
-            tooltip: '取消',
+            icon: const Icon(Icons.delete_outline, color: Color(0xFF718096)),
+            onPressed: _clearMessages,
+            tooltip: '清除对话',
           ),
         IconButton(
           icon: const Icon(Icons.settings_outlined, color: Color(0xFF718096)),
