@@ -1,0 +1,49 @@
+name: dagou_flutter
+description: "A new Flutter project for Gemma Multimodal AI."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.11.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # AI Model - 使用 Flutter Gemma 支持端侧 Gemma 4 多模态模型
+  flutter_gemma: ^0.13.5  # 最新版本，支持 Gemma 4
+
+  # Multimodal inputs
+  camera: ^0.11.0+2
+  image_picker: ^1.1.2
+  video_player: ^2.9.1
+  video_thumbnail: ^0.5.3
+
+  # Voice interactions
+  speech_to_text: ^7.0.0
+  flutter_tts: ^4.1.0
+  # record: ^5.2.1  # 暂时禁用录音功能，避免Linux平台兼容性问题
+
+  # Utilities
+  permission_handler: ^11.3.1
+  path_provider: ^2.1.4
+  http: ^1.2.2
+  dio: ^5.7.0
+
+  # UI enhancements
+  flutter_markdown: ^0.7.4+1
+  loading_animation_widget: ^1.2.1
+  cached_network_image: ^3.4.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  # 内置 Gemma 4 E2B 模型
+  assets:
+    - assets/models/gemma-4-E2B-it.litertlm
