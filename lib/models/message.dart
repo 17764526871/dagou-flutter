@@ -15,6 +15,7 @@ class Message {
   final MessageType type;
   final Uint8List? mediaBytes;
   final String? mediaPath;
+  final int? audioDuration; // 音频时长（秒）
 
   Message({
     required this.id,
@@ -24,6 +25,7 @@ class Message {
     this.type = MessageType.text,
     this.mediaBytes,
     this.mediaPath,
+    this.audioDuration,
   });
 
   factory Message.text({
@@ -66,6 +68,23 @@ class Message {
       timestamp: DateTime.now(),
       type: MessageType.video,
       mediaPath: videoPath,
+    );
+  }
+
+  factory Message.withAudio({
+    required String text,
+    required String audioPath,
+    required bool isUser,
+    int? duration,
+  }) {
+    return Message(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      text: text,
+      isUser: isUser,
+      timestamp: DateTime.now(),
+      type: MessageType.audio,
+      mediaPath: audioPath,
+      audioDuration: duration,
     );
   }
 

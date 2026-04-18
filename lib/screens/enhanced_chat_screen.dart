@@ -223,7 +223,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
               height: 40,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                  colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -307,7 +307,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
             height: 100,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
               ),
               borderRadius: BorderRadius.circular(30),
             ),

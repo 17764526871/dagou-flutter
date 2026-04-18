@@ -158,14 +158,14 @@ class _EnhancedLoadingScreenState extends State<EnhancedLoadingScreen>
                       height: 120,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                          colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(30),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF667EEA).withValues(alpha: 0.4),
+                            color: const Color(0xFF0EA5E9).withValues(alpha: 0.4),
                             blurRadius: 30,
                             offset: const Offset(0, 10),
                           ),
@@ -207,7 +207,7 @@ class _EnhancedLoadingScreenState extends State<EnhancedLoadingScreen>
 
                 // Loading Animation
                 LoadingAnimationWidget.staggeredDotsWave(
-                  color: const Color(0xFF667EEA),
+                  color: const Color(0xFF0EA5E9),
                   size: 50,
                 ),
                 const SizedBox(height: 30),
@@ -240,12 +240,12 @@ class _EnhancedLoadingScreenState extends State<EnhancedLoadingScreen>
                         height: 8,
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                            colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
                           ),
                           borderRadius: BorderRadius.circular(4),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+                              color: const Color(0xFF0EA5E9).withValues(alpha: 0.3),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),

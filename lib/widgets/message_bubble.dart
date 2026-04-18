@@ -29,7 +29,7 @@ class MessageBubble extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: isUser
                     ? const LinearGradient(
-                        colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                        colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       )
@@ -91,7 +91,7 @@ class MessageBubble extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: isUser
             ? const LinearGradient(
-                colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
               )
             : const LinearGradient(
                 colors: [Color(0xFF48BB78), Color(0xFF38A169)],
@@ -99,7 +99,7 @@ class MessageBubble extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: (isUser ? const Color(0xFF667EEA) : const Color(0xFF48BB78))
+            color: (isUser ? const Color(0xFF0EA5E9) : const Color(0xFF48BB78))
                 .withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 2),

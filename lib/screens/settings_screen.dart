@@ -120,7 +120,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               });
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF667EEA),
+              backgroundColor: const Color(0xFF0EA5E9),
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
@@ -204,7 +204,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF667EEA),
+                  color: Color(0xFF0EA5E9),
                 ),
               ),
             ],
@@ -215,7 +215,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             min: min,
             max: max,
             divisions: divisions,
-            activeColor: const Color(0xFF667EEA),
+            activeColor: const Color(0xFF0EA5E9),
             onChanged: onChanged,
           ),
           Text(
@@ -265,7 +265,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           Switch(
             value: value,
-            activeTrackColor: const Color(0xFF667EEA),
+            activeTrackColor: const Color(0xFF0EA5E9),
             onChanged: onChanged,
           ),
         ],

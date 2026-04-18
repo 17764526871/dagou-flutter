@@ -23,13 +23,15 @@ dependencies:
   # Voice interactions
   speech_to_text: ^7.0.0
   flutter_tts: ^4.1.0
-  # record: ^5.2.1  # 暂时禁用录音功能，避免Linux平台兼容性问题
+  record: ^5.2.1
+  just_audio: ^0.9.40
 
   # Utilities
   permission_handler: ^11.3.1
   path_provider: ^2.1.4
   http: ^1.2.2
   dio: ^5.7.0
+  shared_preferences: ^2.2.3
 
   # UI enhancements
   flutter_markdown: ^0.7.4+1
@@ -40,6 +42,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.1
 
 flutter:
   uses-material-design: true

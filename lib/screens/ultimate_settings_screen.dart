@@ -94,7 +94,7 @@ class _UltimateSettingsScreenState extends State<UltimateSettingsScreen> {
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: const BorderSide(
-                            color: Color(0xFF667EEA),
+                            color: Color(0xFF0EA5E9),
                             width: 2,
                           ),
                         ),
@@ -260,7 +260,7 @@ class _UltimateSettingsScreenState extends State<UltimateSettingsScreen> {
               });
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF667EEA),
+              backgroundColor: const Color(0xFF0EA5E9),
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
@@ -325,7 +325,7 @@ class _UltimateSettingsScreenState extends State<UltimateSettingsScreen> {
       backgroundColor: const Color(0xFFF7FAFC),
       labelStyle: const TextStyle(
         fontSize: 12,
-        color: Color(0xFF667EEA),
+        color: Color(0xFF0EA5E9),
       ),
     );
   }
@@ -360,7 +360,7 @@ class _UltimateSettingsScreenState extends State<UltimateSettingsScreen> {
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF667EEA),
+                  color: Color(0xFF0EA5E9),
                 ),
               ),
             ],
@@ -371,7 +371,7 @@ class _UltimateSettingsScreenState extends State<UltimateSettingsScreen> {
             min: min,
             max: max,
             divisions: divisions,
-            activeColor: const Color(0xFF667EEA),
+            activeColor: const Color(0xFF0EA5E9),
             onChanged: onChanged,
           ),
           Text(
@@ -421,7 +421,7 @@ class _UltimateSettingsScreenState extends State<UltimateSettingsScreen> {
           ),
           Switch(
             value: value,
-            activeTrackColor: const Color(0xFF667EEA),
+            activeTrackColor: const Color(0xFF0EA5E9),
             onChanged: onChanged,
           ),
         ],
@@ -460,7 +460,7 @@ class _UltimateSettingsScreenState extends State<UltimateSettingsScreen> {
             underline: Container(),
             style: const TextStyle(
               fontSize: 15,
-              color: Color(0xFF667EEA),
+              color: Color(0xFF0EA5E9),
               fontWeight: FontWeight.w500,
             ),
           ),

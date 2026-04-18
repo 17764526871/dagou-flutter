@@ -181,7 +181,7 @@ class _WeChatInputBarState extends State<WeChatInputBar>
         child: Icon(
           icon,
           size: 22,
-          color: const Color(0xFF667EEA),
+          color: const Color(0xFF0EA5E9),
         ),
       ),
     );
@@ -233,12 +233,12 @@ class _WeChatInputBarState extends State<WeChatInputBar>
         height: 40,
         decoration: BoxDecoration(
           color: _isRecording
-              ? (_isCancelZone ? const Color(0xFFF56565) : const Color(0xFF667EEA))
+              ? (_isCancelZone ? const Color(0xFFF56565) : const Color(0xFF0EA5E9))
               : const Color(0xFFF7FAFC),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: _isRecording
-                ? (_isCancelZone ? const Color(0xFFF56565) : const Color(0xFF667EEA))
+                ? (_isCancelZone ? const Color(0xFFF56565) : const Color(0xFF0EA5E9))
                 : const Color(0xFFE2E8F0),
             width: 2,
           ),
@@ -250,7 +250,7 @@ class _WeChatInputBarState extends State<WeChatInputBar>
               : '按住说话',
           style: TextStyle(
             fontSize: 15,
-            color: _isRecording ? Colors.white : const Color(0xFF667EEA),
+            color: _isRecording ? Colors.white : const Color(0xFF0EA5E9),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -273,7 +273,7 @@ class _WeChatInputBarState extends State<WeChatInputBar>
                 height: height,
                 margin: const EdgeInsets.symmetric(horizontal: 2),
                 decoration: BoxDecoration(
-                  color: _isCancelZone ? const Color(0xFFF56565) : const Color(0xFF667EEA),
+                  color: _isCancelZone ? const Color(0xFFF56565) : const Color(0xFF0EA5E9),
                   borderRadius: BorderRadius.circular(2),
                 ),
               );
@@ -305,7 +305,7 @@ class _WeChatInputBarState extends State<WeChatInputBar>
           _buildMenuButton(
             icon: Icons.image_rounded,
             label: '相册',
-            color: const Color(0xFF667EEA),
+            color: const Color(0xFF0EA5E9),
             onTap: widget.onImagePick,
           ),
           _buildMenuButton(

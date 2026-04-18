@@ -34,7 +34,7 @@ class InputBar extends StatelessWidget {
               _buildActionButton(
                 icon: Icons.image_rounded,
                 label: '图片',
-                color: const Color(0xFF667EEA),
+                color: const Color(0xFF0EA5E9),
                 onPressed: onImagePick,
               ),
               _buildActionButton(
@@ -99,14 +99,14 @@ class InputBar extends StatelessWidget {
               Container(
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                    colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+                      color: const Color(0xFF0EA5E9).withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     ),

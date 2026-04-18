@@ -51,7 +51,7 @@ class EnhancedMessageBubble extends StatelessWidget {
                       decoration: BoxDecoration(
                         gradient: isUser
                             ? const LinearGradient(
-                                colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                                colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               )
@@ -97,7 +97,7 @@ class EnhancedMessageBubble extends StatelessWidget {
                                       code: TextStyle(
                                         backgroundColor:
                                             const Color(0xFFF7FAFC),
-                                        color: const Color(0xFF667EEA),
+                                        color: const Color(0xFF0EA5E9),
                                         fontSize: 14,
                                       ),
                                       codeblockDecoration: BoxDecoration(
@@ -124,7 +124,7 @@ class EnhancedMessageBubble extends StatelessWidget {
                                         color: Color(0xFF2D3748),
                                       ),
                                       listBullet: const TextStyle(
-                                        color: Color(0xFF667EEA),
+                                        color: Color(0xFF0EA5E9),
                                       ),
                                     ),
                                   ),
@@ -154,7 +154,7 @@ class EnhancedMessageBubble extends StatelessWidget {
                               child: const Icon(
                                 Icons.volume_up_rounded,
                                 size: 16,
-                                color: Color(0xFF667EEA),
+                                color: Color(0xFF0EA5E9),
                               ),
                             ),
                           ),
@@ -182,7 +182,7 @@ class EnhancedMessageBubble extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: isUser
             ? const LinearGradient(
-                colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
               )
             : const LinearGradient(
                 colors: [Color(0xFF48BB78), Color(0xFF38A169)],
@@ -190,7 +190,7 @@ class EnhancedMessageBubble extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: (isUser ? const Color(0xFF667EEA) : const Color(0xFF48BB78))
+            color: (isUser ? const Color(0xFF0EA5E9) : const Color(0xFF48BB78))
                 .withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 2),
@@ -239,7 +239,7 @@ class EnhancedMessageBubble extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Color.lerp(
                     const Color(0xFFE2E8F0),
-                    const Color(0xFF667EEA),
+                    const Color(0xFF0EA5E9),
                     animValue,
                   ),
                   shape: BoxShape.circle,

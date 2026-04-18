@@ -190,7 +190,7 @@ class _ModernInputBarState extends State<ModernInputBar>
         child: Icon(
           icon,
           size: 22,
-          color: const Color(0xFF667EEA),
+          color: const Color(0xFF0EA5E9),
         ),
       ),
     );
@@ -246,12 +246,12 @@ class _ModernInputBarState extends State<ModernInputBar>
         height: 36,
         decoration: BoxDecoration(
           color: _isRecording
-              ? (_isCancelZone ? const Color(0xFFF56565) : const Color(0xFF667EEA))
+              ? (_isCancelZone ? const Color(0xFFF56565) : const Color(0xFF0EA5E9))
               : const Color(0xFFF7FAFC),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: _isRecording
-                ? (_isCancelZone ? const Color(0xFFF56565) : const Color(0xFF667EEA))
+                ? (_isCancelZone ? const Color(0xFFF56565) : const Color(0xFF0EA5E9))
                 : const Color(0xFFE2E8F0),
             width: _isRecording ? 2 : 1,
           ),
@@ -263,7 +263,7 @@ class _ModernInputBarState extends State<ModernInputBar>
               : '按住说话',
           style: TextStyle(
             fontSize: 15,
-            color: _isRecording ? Colors.white : const Color(0xFF667EEA),
+            color: _isRecording ? Colors.white : const Color(0xFF0EA5E9),
             fontWeight: _isRecording ? FontWeight.w600 : FontWeight.normal,
           ),
         ),
@@ -282,7 +282,7 @@ class _ModernInputBarState extends State<ModernInputBar>
           gradient: widget.isSending
               ? null
               : const LinearGradient(
-                  colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                  colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
                 ),
           color: widget.isSending ? const Color(0xFFE2E8F0) : null,
           borderRadius: BorderRadius.circular(18),
@@ -317,7 +317,7 @@ class _ModernInputBarState extends State<ModernInputBar>
                 decoration: BoxDecoration(
                   color: _isCancelZone
                       ? const Color(0xFFF56565)
-                      : const Color(0xFF667EEA),
+                      : const Color(0xFF0EA5E9),
                   borderRadius: BorderRadius.circular(1.5),
                 ),
               );
@@ -359,7 +359,7 @@ class _ModernInputBarState extends State<ModernInputBar>
           _buildMenuButton(
             icon: Icons.image_rounded,
             label: '相册',
-            color: const Color(0xFF667EEA),
+            color: const Color(0xFF0EA5E9),
             onTap: widget.onImagePick,
           ),
           const SizedBox(width: 24),

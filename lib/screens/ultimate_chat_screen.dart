@@ -298,7 +298,7 @@ class _UltimateChatScreenState extends State<UltimateChatScreen> {
             height: 40,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
               ),
               borderRadius: BorderRadius.circular(12),
             ),
@@ -356,10 +356,10 @@ class _UltimateChatScreenState extends State<UltimateChatScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+        color: const Color(0xFF0EA5E9).withValues(alpha: 0.1),
         border: Border(
           bottom: BorderSide(
-            color: const Color(0xFF667EEA).withValues(alpha: 0.2),
+            color: const Color(0xFF0EA5E9).withValues(alpha: 0.2),
             width: 1,
           ),
         ),
@@ -397,7 +397,7 @@ class _UltimateChatScreenState extends State<UltimateChatScreen> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16, color: const Color(0xFF667EEA)),
+        Icon(icon, size: 16, color: const Color(0xFF0EA5E9)),
         const SizedBox(width: 4),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -415,7 +415,7 @@ class _UltimateChatScreenState extends State<UltimateChatScreen> {
               style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF667EEA),
+                color: Color(0xFF0EA5E9),
               ),
             ),
           ],
@@ -489,7 +489,7 @@ class _UltimateChatScreenState extends State<UltimateChatScreen> {
             height: 100,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
               ),
               borderRadius: BorderRadius.circular(30),
             ),

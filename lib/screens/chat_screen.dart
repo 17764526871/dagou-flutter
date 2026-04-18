@@ -206,7 +206,7 @@ class _ChatScreenState extends State<ChatScreen> {
               height: 40,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                  colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -273,7 +273,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           height: 100,
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
-                              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                              colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
                             ),
                             borderRadius: BorderRadius.circular(30),
                           ),
@@ -315,7 +315,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   LoadingAnimationWidget.staggeredDotsWave(
-                    color: const Color(0xFF667EEA),
+                    color: const Color(0xFF0EA5E9),
                     size: 32,
                   ),
                   const SizedBox(width: 12),

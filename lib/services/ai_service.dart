@@ -8,6 +8,12 @@ class AIService {
   InferenceChat? _chat;
   bool _isInitialized = false;
 
+  // 当前模型参数
+  double _temperature = 1.0;
+  int _topK = 64;
+  double _topP = 0.95;
+  int _maxTokens = 8192;
+
   bool get isInitialized => _isInitialized;
 
   /// 初始化 Gemma 4 E2B 端侧多模态模型
@@ -99,22 +105,63 @@ class AIService {
   }
 
   /// 流式生成响应（实时显示）
-  Stream<String> sendMessageStream(String text, {Uint8List? imageBytes}) async* {
+  Stream<String> sendMessageStream(
+    String text, {
+    Uint8List? imageBytes,
+    String? systemPrompt,
+    double? temperature,
+    int? topK,
+    double? topP,
+    int? maxTokens,
+  }) async* {
     if (!_isInitialized || _chat == null) {
       yield '模型未初始化';
       return;
     }
 
     try {
+      // 如果提供了新的模型参数，需要重新创建聊天会话
+      if (temperature != null || topK != null || topP != null || maxTokens != null) {
+        _temperature = temperature ?? _temperature;
+        _topK = topK ?? _topK;
+        _topP = topP ?? _topP;
+        _maxTokens = maxTokens ?? _maxTokens;
+
+        // 重新创建聊天会话
+        final model = await FlutterGemma.getActiveModel(
+          maxTokens: _maxTokens,
+          supportImage: true,
+          maxNumImages: 1,
+          supportAudio: true,
+          preferredBackend: PreferredBackend.gpu,
+        );
+
+        _chat = await model.createChat(
+          temperature: _temperature,
+          topK: _topK,
+          topP: _topP,
+          randomSeed: 42,
+          tokenBuffer: 512,
+          supportImage: true,
+          supportAudio: true,
+        );
+      }
+
+      // 如果提供了系统提示词，在用户消息前添加
+      String finalText = text;
+      if (systemPrompt != null && systemPrompt.isNotEmpty) {
+        finalText = '$systemPrompt\n\n用户: $text';
+      }
+
       // 创建消息
       final message = imageBytes != null
           ? Message(
-              text: text,
+              text: finalText,
               imageBytes: imageBytes,
               isUser: true,
             )
           : Message(
-              text: text,
+              text: finalText,
               isUser: true,
             );
 
