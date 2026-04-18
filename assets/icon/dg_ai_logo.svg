@@ -1,0 +1,60 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景渐变 -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667EEA;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764BA2;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F0F0FF;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- 圆角矩形背景 -->
+  <rect width="1024" height="1024" rx="220" fill="url(#bgGradient)"/>
+
+  <!-- 装饰圆圈 -->
+  <circle cx="200" cy="200" r="80" fill="white" opacity="0.05"/>
+  <circle cx="824" cy="824" r="120" fill="white" opacity="0.05"/>
+  <circle cx="850" cy="180" r="60" fill="white" opacity="0.08"/>
+
+  <!-- DG 文字 -->
+  <g transform="translate(512, 420)" filter="url(#glow)">
+    <!-- D 字母 -->
+    <path d="M -280 -120 L -180 -120 Q -80 -120 -80 -20 L -80 20 Q -80 120 -180 120 L -280 120 Z M -220 -60 L -220 60 L -180 60 Q -140 60 -140 20 L -140 -20 Q -140 -60 -180 -60 Z"
+          fill="url(#textGradient)" stroke="white" stroke-width="4"/>
+
+    <!-- G 字母 -->
+    <path d="M 80 -120 Q 180 -120 220 -80 Q 260 -40 260 20 L 260 60 Q 260 120 220 120 L 120 120 L 120 60 L 200 60 Q 200 60 200 20 L 200 -20 Q 200 -60 160 -60 L 120 -60 Q 80 -60 80 -20 L 80 20 Q 80 60 120 60 L 140 60 L 140 0 L 200 0 L 200 120 L 120 120 Q 20 120 20 20 L 20 -20 Q 20 -120 120 -120 Z"
+          fill="url(#textGradient)" stroke="white" stroke-width="4"/>
+  </g>
+
+  <!-- AI 文字 -->
+  <g transform="translate(512, 640)">
+    <text x="0" y="0"
+          font-family="Arial, sans-serif"
+          font-size="120"
+          font-weight="bold"
+          fill="white"
+          text-anchor="middle"
+          opacity="0.95">AI</text>
+  </g>
+
+  <!-- 装饰星星 -->
+  <g opacity="0.6">
+    <path d="M 180 500 L 185 510 L 195 515 L 185 520 L 180 530 L 175 520 L 165 515 L 175 510 Z" fill="white"/>
+    <path d="M 820 420 L 827 433 L 840 440 L 827 447 L 820 460 L 813 447 L 800 440 L 813 433 Z" fill="white"/>
+    <path d="M 250 780 L 255 790 L 265 795 L 255 800 L 250 810 L 245 800 L 235 795 L 245 790 Z" fill="white"/>
+  </g>
+
+  <!-- 底部装饰线 -->
+  <path d="M 200 900 Q 512 880 824 900" stroke="white" stroke-width="3" fill="none" opacity="0.3"/>
+</svg>

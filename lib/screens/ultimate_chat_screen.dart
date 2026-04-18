@@ -1,0 +1,528 @@
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'dart:typed_data';
+import 'dart:async';
+import '../models/message.dart';
+import '../services/ai_service.dart';
+import '../widgets/enhanced_message_bubble.dart';
+import '../widgets/modern_input_bar.dart';
+import 'ultimate_settings_screen.dart';
+
+class UltimateChatScreen extends StatefulWidget {
+  const UltimateChatScreen({super.key});
+
+  @override
+  State<UltimateChatScreen> createState() => _UltimateChatScreenState();
+}
+
+class _UltimateChatScreenState extends State<UltimateChatScreen> {
+  final TextEditingController _textController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  final List<Message> _messages = [];
+  final ImagePicker _picker = ImagePicker();
+  final FlutterTts _flutterTts = FlutterTts();
+
+  bool _isSending = false;
+  int? _streamingMessageIndex;
+  String _streamingText = '';
+  Uint8List? _pendingImage;
+  bool _showImagePreview = false;
+
+  // 性能指标
+  int _totalTokens = 0;
+  double _tokensPerSecond = 0.0;
+  DateTime? _inferenceStartTime;
+  bool _showMetrics = true;
+
+  // 设置参数
+  String _systemPrompt = '你是一个有帮助的AI助手。';
+  bool _enableTts = true;
+  bool _autoPlayTts = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initTts();
+    _addWelcomeMessage();
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    _scrollController.dispose();
+    _flutterTts.stop();
+    super.dispose();
+  }
+
+  void _addWelcomeMessage() {
+    setState(() {
+      _messages.add(Message.text(
+        text: '👋 你好！我是 **DG AI** 助手\n\n'
+            '✨ 完全运行在你手机上的端侧 AI\n'
+            '🔒 无需联网，保护隐私\n\n'
+            '**我可以帮你：**\n'
+            '- 💬 智能对话\n'
+            '- 🖼️ 图片分析\n'
+            '- 🌐 中英互译\n'
+            '- 🎤 语音交互\n\n'
+            '开始对话吧！',
+        isUser: false,
+      ));
+    });
+  }
+
+  Future<void> _initTts() async {
+    await _flutterTts.setLanguage('zh-CN');
+    await _flutterTts.setSpeechRate(0.5);
+    await _flutterTts.setVolume(1.0);
+    await _flutterTts.setPitch(1.0);
+  }
+
+  Future<void> _sendMessage({String? text, Uint8List? imageBytes}) async {
+    final msgText = text ?? _textController.text.trim();
+    if (msgText.isEmpty && imageBytes == null && _pendingImage == null) return;
+
+    final finalImage = imageBytes ?? _pendingImage;
+
+    _textController.clear();
+    setState(() {
+      _isSending = true;
+      _pendingImage = null;
+      _showImagePreview = false;
+      _inferenceStartTime = DateTime.now();
+      _totalTokens = 0;
+      _tokensPerSecond = 0.0;
+    });
+
+    Message userMsg;
+    if (finalImage != null) {
+      userMsg = Message.withImage(
+        text: msgText.isEmpty ? '请分析这张图片' : msgText,
+        imageBytes: finalImage,
+        isUser: true,
+      );
+    } else {
+      userMsg = Message.text(text: msgText, isUser: true);
+    }
+
+    setState(() {
+      _messages.add(userMsg);
+      _streamingMessageIndex = _messages.length;
+      _streamingText = '';
+      _messages.add(Message.text(text: '', isUser: false));
+    });
+
+    _scrollToBottom();
+
+    try {
+      // 使用流式输出
+      await for (final chunk in AIService.instance.sendMessageStream(
+        msgText,
+        imageBytes: finalImage,
+      )) {
+        if (mounted) {
+          setState(() {
+            _streamingText += chunk;
+            if (_streamingMessageIndex != null) {
+              _messages[_streamingMessageIndex!] =
+                  Message.text(text: _streamingText, isUser: false);
+            }
+
+            // 更新性能指标
+            _totalTokens++;
+            if (_inferenceStartTime != null) {
+              final elapsed = DateTime.now().difference(_inferenceStartTime!);
+              _tokensPerSecond = _totalTokens / elapsed.inMilliseconds * 1000;
+            }
+          });
+          _scrollToBottom();
+        }
+      }
+
+      setState(() {
+        _isSending = false;
+        _streamingMessageIndex = null;
+      });
+
+      // 自动播报
+      if (_enableTts && _autoPlayTts && _streamingText.isNotEmpty) {
+        await _playTts(_streamingText);
+      }
+    } catch (e) {
+      setState(() {
+        if (_streamingMessageIndex != null) {
+          _messages[_streamingMessageIndex!] =
+              Message.text(text: '抱歉，发生了错误：$e', isUser: false);
+        }
+        _isSending = false;
+        _streamingMessageIndex = null;
+      });
+    }
+  }
+
+  Future<void> _handleVoiceRecorded(String voicePath) async {
+    // TODO: 实现语音识别
+    await _sendMessage(text: '[语音消息: $voicePath]');
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? image = await _picker.pickImage(source: source);
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        setState(() {
+          _pendingImage = bytes;
+          _showImagePreview = true;
+        });
+      }
+    } catch (e) {
+      _showError('选择图片失败：$e');
+    }
+  }
+
+  Future<void> _playTts(String text) async {
+    if (_enableTts) {
+      await _flutterTts.speak(text);
+    }
+  }
+
+  void _cancelSending() {
+    setState(() {
+      _isSending = false;
+      if (_streamingMessageIndex != null) {
+        _messages.removeAt(_streamingMessageIndex!);
+        _streamingMessageIndex = null;
+      }
+      _streamingText = '';
+    });
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red.shade400,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  Future<void> _openSettings() async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(builder: (_) => const UltimateSettingsScreen()),
+    );
+
+    if (result != null) {
+      setState(() {
+        _systemPrompt = result['systemPrompt'] ?? _systemPrompt;
+        _enableTts = result['enableTts'] ?? _enableTts;
+        _autoPlayTts = result['autoPlayTts'] ?? _autoPlayTts;
+        _showMetrics = result['showMetrics'] ?? _showMetrics;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
+      appBar: _buildAppBar(),
+      body: Column(
+        children: [
+          // 性能指标栏
+          if (_showMetrics && _isSending) _buildMetricsBar(),
+
+          // 消息列表
+          Expanded(
+            child: _messages.isEmpty
+                ? _buildEmptyState()
+                : ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) {
+                      final message = _messages[index];
+                      final isStreaming = index == _streamingMessageIndex;
+                      return EnhancedMessageBubble(
+                        message: message,
+                        isThinking: isStreaming,
+                        onTtsPlay: !message.isUser && message.text.isNotEmpty
+                            ? () => _playTts(message.text)
+                            : null,
+                      );
+                    },
+                  ),
+          ),
+
+          // 图片预览
+          if (_showImagePreview && _pendingImage != null)
+            _buildImagePreview(),
+
+          // 输入栏
+          ModernInputBar(
+            controller: _textController,
+            onSend: _isSending ? () {} : () => _sendMessage(),
+            onVoiceRecorded: _handleVoiceRecorded,
+            onCameraPick: () => _pickImage(ImageSource.camera),
+            onImagePick: () => _pickImage(ImageSource.gallery),
+            isSending: _isSending,
+          ),
+        ],
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      elevation: 0,
+      backgroundColor: Colors.white,
+      title: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Center(
+              child: Text(
+                'DG',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'DG AI',
+                style: TextStyle(
+                  color: Color(0xFF2D3748),
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                '智能助手',
+                style: TextStyle(
+                  color: Color(0xFF718096),
+                  fontSize: 12,
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        if (_isSending)
+          IconButton(
+            icon: const Icon(Icons.close, color: Color(0xFFF56565)),
+            onPressed: _cancelSending,
+            tooltip: '取消',
+          ),
+        IconButton(
+          icon: const Icon(Icons.settings_outlined, color: Color(0xFF718096)),
+          onPressed: _openSettings,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMetricsBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+        border: Border(
+          bottom: BorderSide(
+            color: const Color(0xFF667EEA).withValues(alpha: 0.2),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildMetricItem(
+            icon: Icons.speed,
+            label: '速度',
+            value: '${_tokensPerSecond.toStringAsFixed(1)} t/s',
+          ),
+          _buildMetricItem(
+            icon: Icons.token,
+            label: 'Tokens',
+            value: _totalTokens.toString(),
+          ),
+          _buildMetricItem(
+            icon: Icons.timer,
+            label: '时长',
+            value: _inferenceStartTime != null
+                ? '${DateTime.now().difference(_inferenceStartTime!).inSeconds}s'
+                : '0s',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricItem({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: const Color(0xFF667EEA)),
+        const SizedBox(width: 4),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 10,
+                color: Color(0xFF718096),
+              ),
+            ),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF667EEA),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImagePreview() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(
+            color: const Color(0xFFE2E8F0),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.memory(
+                  _pendingImage!,
+                  width: 60,
+                  height: 60,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              Positioned(
+                top: -8,
+                right: -8,
+                child: IconButton(
+                  icon: const Icon(Icons.cancel, color: Colors.red, size: 20),
+                  onPressed: () {
+                    setState(() {
+                      _pendingImage = null;
+                      _showImagePreview = false;
+                    });
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              '图片已选择，输入问题后发送',
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF718096),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+              ),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: const Center(
+              child: Text(
+                'DG',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 36,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            '开始对话',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF2D3748),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '发送消息或选择功能开始',
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF718096),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
