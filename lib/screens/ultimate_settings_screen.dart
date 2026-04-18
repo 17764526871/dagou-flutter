@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../services/settings_service.dart';
+import '../services/cache_service.dart';
 
 class UltimateSettingsScreen extends StatefulWidget {
   const UltimateSettingsScreen({super.key});
@@ -32,13 +34,143 @@ class _UltimateSettingsScreenState extends State<UltimateSettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _systemPromptController.text = '你是一个有帮助的AI助手。';
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    await SettingsService.instance.initialize();
+    setState(() {
+      _systemPromptController.text = SettingsService.instance.loadSystemPrompt();
+
+      final modelParams = SettingsService.instance.loadModelParams();
+      _temperature = modelParams['temperature'];
+      _topK = modelParams['topK'];
+      _topP = modelParams['topP'];
+      _maxTokens = modelParams['maxTokens'];
+
+      final ttsSettings = SettingsService.instance.loadTtsSettings();
+      _enableTts = ttsSettings['enableTts'];
+      _autoPlayTts = ttsSettings['autoPlay'];
+      _ttsLanguage = ttsSettings['language'];
+
+      final translationSettings = SettingsService.instance.loadTranslationSettings();
+      _enableTranslation = translationSettings['enable'];
+      _translationMode = translationSettings['mode'];
+
+      final displaySettings = SettingsService.instance.loadDisplaySettings();
+      _showMetrics = displaySettings['showMetrics'];
+      _showTimestamp = displaySettings['showTimestamp'];
+    });
   }
 
   @override
   void dispose() {
     _systemPromptController.dispose();
     super.dispose();
+  }
+
+  Future<void> _saveSettings() async {
+    await SettingsService.instance.saveSystemPrompt(_systemPromptController.text);
+    await SettingsService.instance.saveModelParams(
+      temperature: _temperature,
+      topK: _topK,
+      topP: _topP,
+      maxTokens: _maxTokens,
+    );
+    await SettingsService.instance.saveTtsSettings(
+      enableTts: _enableTts,
+      autoPlay: _autoPlayTts,
+      language: _ttsLanguage,
+    );
+    await SettingsService.instance.saveTranslationSettings(
+      enable: _enableTranslation,
+      mode: _translationMode,
+    );
+    await SettingsService.instance.saveDisplaySettings(
+      showMetrics: _showMetrics,
+      showTimestamp: _showTimestamp,
+    );
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('设置已保存'),
+          backgroundColor: Color(0xFF48BB78),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      Navigator.pop(context);
+    }
+  }
+
+  Future<void> _resetSettings() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('重置设置'),
+        content: const Text('确定要重置所有设置为默认值吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('确定', style: TextStyle(color: Color(0xFFF56565))),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await SettingsService.instance.resetToDefaults();
+      await _loadSettings();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('设置已重置'),
+            backgroundColor: Color(0xFF48BB78),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _clearCache() async {
+    final cacheSize = await CacheService.instance.getCacheSize();
+    final sizeStr = CacheService.formatBytes(cacheSize);
+
+    if (!mounted) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('清除缓存'),
+        content: Text('当前缓存大小：$sizeStr\n\n确定要清除所有缓存吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('确定', style: TextStyle(color: Color(0xFFF56565))),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final success = await CacheService.instance.clearAllCache();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(success ? '缓存已清除' : '清除缓存失败'),
+            backgroundColor: success ? const Color(0xFF48BB78) : const Color(0xFFF56565),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -240,25 +372,11 @@ class _UltimateSettingsScreenState extends State<UltimateSettingsScreen> {
               _buildInfoItem('运行模式', '端侧离线'),
             ],
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
 
+          // 保存按钮
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context, {
-                'systemPrompt': _systemPromptController.text,
-                'temperature': _temperature,
-                'topK': _topK,
-                'topP': _topP,
-                'maxTokens': _maxTokens,
-                'enableTts': _enableTts,
-                'autoPlayTts': _autoPlayTts,
-                'ttsLanguage': _ttsLanguage,
-                'enableTranslation': _enableTranslation,
-                'translationMode': _translationMode,
-                'showMetrics': _showMetrics,
-                'showTimestamp': _showTimestamp,
-              });
-            },
+            onPressed: _saveSettings,
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF0EA5E9),
               foregroundColor: Colors.white,
@@ -269,6 +387,42 @@ class _UltimateSettingsScreenState extends State<UltimateSettingsScreen> {
             ),
             child: const Text(
               '保存设置',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // 重置按钮
+          OutlinedButton(
+            onPressed: _resetSettings,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF718096),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              side: const BorderSide(color: Color(0xFFE2E8F0)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              '重置为默认设置',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // 清除缓存按钮
+          OutlinedButton(
+            onPressed: _clearCache,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFFF56565),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              side: const BorderSide(color: Color(0xFFF56565)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              '清除缓存',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
           ),

@@ -15,7 +15,6 @@ class _EnhancedLoadingScreenState extends State<EnhancedLoadingScreen>
   String _statusMessage = '正在初始化...';
   double _progress = 0.0;
   late AnimationController _pulseController;
-  late AnimationController _rotateController;
 
   @override
   void initState() {
@@ -25,18 +24,12 @@ class _EnhancedLoadingScreenState extends State<EnhancedLoadingScreen>
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
 
-    _rotateController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 3),
-    )..repeat();
-
     _initializeApp();
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
-    _rotateController.dispose();
     super.dispose();
   }
 
@@ -151,34 +144,31 @@ class _EnhancedLoadingScreenState extends State<EnhancedLoadingScreen>
                       child: child,
                     );
                   },
-                  child: RotationTransition(
-                    turns: _rotateController,
-                    child: Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF0EA5E9).withValues(alpha: 0.4),
-                            blurRadius: 30,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
+                  child: Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      child: const Center(
-                        child: Text(
-                          'DG',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 48,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF0EA5E9).withValues(alpha: 0.4),
+                          blurRadius: 30,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'DG',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 48,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
