@@ -102,7 +102,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
                     borderRadius: BorderRadius.circular(30),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF667EEA).withOpacity(0.3),
+                        color: const Color(0xFF667EEA).withValues(alpha: 0.3),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),

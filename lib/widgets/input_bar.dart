@@ -106,7 +106,7 @@ class InputBar extends StatelessWidget {
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF667EEA).withOpacity(0.3),
+                      color: const Color(0xFF667EEA).withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     ),
@@ -156,12 +156,12 @@ class InputBar extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: isActive ? color : color.withOpacity(0.1),
+                color: isActive ? color : color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: isActive
                     ? [
                         BoxShadow(
-                          color: color.withOpacity(0.3),
+                          color: color.withValues(alpha: 0.3),
                           blurRadius: 8,
                           offset: const Offset(0, 4),
                         ),

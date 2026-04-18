@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_gemma/flutter_gemma.dart';
-import 'screens/chat_screen.dart';
 import 'screens/loading_screen.dart';
-import 'services/ai_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

@@ -51,3 +51,9 @@ lib/config/app_config.dart
 secrets.json
 api_keys.json
 
+# 大模型文件 - 需要单独下载
+assets/models/*.litertlm
+assets/models/*.task
+assets/models/*.bin
+assets/models/*.gguf
+

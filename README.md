@@ -72,18 +72,32 @@ git clone https://github.com/your-username/dagou-flutter.git
 cd dagou-flutter
 ```
 
-2. **安装依赖**
+2. **下载模型文件**
+
+由于模型文件较大（约2.5GB），需要单独下载：
+
+```bash
+# 使用 curl 下载（推荐国内用户使用镜像）
+cd assets/models
+curl -L "https://hf-mirror.com/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm" -o gemma-4-E2B-it.litertlm
+```
+
+或访问 [HuggingFace](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm) 手动下载，放置到 `assets/models/` 目录。
+
+详细说明请查看 [assets/models/README.md](assets/models/README.md)
+
+3. **安装依赖**
 ```bash
 flutter pub get
 ```
 
-3. **连接设备**
+4. **连接设备**
 ```bash
 # 确保 Android 设备已连接并开启 USB 调试
 flutter devices
 ```
 
-4. **运行应用**
+5. **运行应用**
 ```bash
 flutter run
 ```
