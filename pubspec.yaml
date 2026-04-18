@@ -23,7 +23,7 @@ dependencies:
   # Voice interactions
   speech_to_text: ^7.0.0
   flutter_tts: ^4.1.0
-  record: ^5.2.1
+  record: 5.1.2
   just_audio: ^0.9.40
 
   # Utilities
