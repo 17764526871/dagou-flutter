@@ -50,3 +50,6 @@ flutter:
   # 内置 Gemma 4 E2B 模型
   assets:
     - assets/models/gemma-4-E2B-it.litertlm
+
+dependency_overrides:
+  record_linux: 1.3.0
