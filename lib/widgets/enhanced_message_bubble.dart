@@ -2,17 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'dart:typed_data';
 import '../models/message.dart';
+import 'audio_player_widget.dart';
 
 class EnhancedMessageBubble extends StatelessWidget {
   final Message message;
   final VoidCallback? onTtsPlay;
   final bool isThinking;
+  final bool showTimestamp;
 
   const EnhancedMessageBubble({
     super.key,
     required this.message,
     this.onTtsPlay,
     this.isThinking = false,
+    this.showTimestamp = true,
   });
 
   @override
@@ -74,9 +77,17 @@ class EnhancedMessageBubble extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // 音频消息
+                          if (message.type == MessageType.audio && message.mediaPath != null)
+                            AudioPlayerWidget(
+                              audioPath: message.mediaPath!,
+                              duration: message.audioDuration,
+                            ),
+                          // 图片消息
                           if (message.hasMedia && message.mediaBytes != null)
                             _buildImage(message.mediaBytes!),
-                          if (message.text.isNotEmpty)
+                          // 文本消息
+                          if (message.text.isNotEmpty && message.type != MessageType.audio)
                             isUser
                                 ? Text(
                                     message.text,
@@ -132,35 +143,37 @@ class EnhancedMessageBubble extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    // 时间和TTS按钮
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          _formatTime(message.timestamp),
-                          style: const TextStyle(
-                            color: Color(0xFFA0AEC0),
-                            fontSize: 11,
-                          ),
-                        ),
-                        if (!isUser && onTtsPlay != null) ...[
-                          const SizedBox(width: 8),
-                          InkWell(
-                            onTap: onTtsPlay,
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              child: const Icon(
-                                Icons.volume_up_rounded,
-                                size: 16,
-                                color: Color(0xFF0EA5E9),
-                              ),
+                    if (showTimestamp) ...[
+                      const SizedBox(height: 6),
+                      // 时间和TTS按钮
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _formatTime(message.timestamp),
+                            style: const TextStyle(
+                              color: Color(0xFFA0AEC0),
+                              fontSize: 11,
                             ),
                           ),
+                          if (!isUser && onTtsPlay != null) ...[
+                            const SizedBox(width: 8),
+                            InkWell(
+                              onTap: onTtsPlay,
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                child: const Icon(
+                                  Icons.volume_up_rounded,
+                                  size: 16,
+                                  color: Color(0xFF0EA5E9),
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
+                      ),
+                    ],
                   ],
                 ),
               ),

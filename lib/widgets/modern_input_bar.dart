@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'package:path_provider/path_provider.dart';
+import '../services/audio_service.dart';
 
 class ModernInputBar extends StatefulWidget {
   final TextEditingController controller;
   final VoidCallback onSend;
-  final Function(String) onVoiceRecorded;
+  final Function(String, int) onVoiceRecorded;
   final VoidCallback onCameraPick;
   final VoidCallback onImagePick;
   final bool isSending;
@@ -31,8 +31,8 @@ class _ModernInputBarState extends State<ModernInputBar>
   bool _isCancelZone = false;
   bool _showMoreMenu = false;
 
-  // 真实音频可视化数据
-  final List<double> _audioLevels = List.filled(20, 0.0);
+  // 音频可视化数据
+  final List<double> _audioLevels = List.filled(15, 0.0);
   Timer? _audioTimer;
   int _recordingSeconds = 0;
   Timer? _recordingTimer;
@@ -45,6 +45,16 @@ class _ModernInputBarState extends State<ModernInputBar>
   }
 
   void _startRecording() async {
+    final success = await AudioService.instance.startRecording();
+    if (!success) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('录音权限未授予')),
+        );
+      }
+      return;
+    }
+
     setState(() {
       _isRecording = true;
       _isCancelZone = false;
@@ -60,13 +70,16 @@ class _ModernInputBarState extends State<ModernInputBar>
       }
     });
 
-    // 模拟音频波形（实际应该从麦克风获取）
-    _audioTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+    // 音频可视化（使用真实音量数据）
+    _audioTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) async {
       if (mounted && _isRecording) {
+        final amplitude = await AudioService.instance.getAmplitude();
         setState(() {
-          for (int i = 0; i < _audioLevels.length; i++) {
-            _audioLevels[i] = 0.2 + (DateTime.now().millisecond % 100) / 100 * 0.8;
+          // 更新波形，从右向左移动
+          for (int i = 0; i < _audioLevels.length - 1; i++) {
+            _audioLevels[i] = _audioLevels[i + 1];
           }
+          _audioLevels[_audioLevels.length - 1] = amplitude;
         });
       }
     });
@@ -77,12 +90,12 @@ class _ModernInputBarState extends State<ModernInputBar>
     _recordingTimer?.cancel();
 
     if (!_isCancelZone && _recordingSeconds > 0) {
-      // 保存录音并发送
-      final directory = await getTemporaryDirectory();
-      final path = '${directory.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
-
-      // 实际录音逻辑应该在这里保存文件
-      widget.onVoiceRecorded(path);
+      final path = await AudioService.instance.stopRecording();
+      if (path != null) {
+        widget.onVoiceRecorded(path, _recordingSeconds);
+      }
+    } else {
+      await AudioService.instance.cancelRecording();
     }
 
     setState(() {
@@ -298,8 +311,17 @@ class _ModernInputBarState extends State<ModernInputBar>
 
   Widget _buildRecordingOverlay() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-      color: Colors.black.withValues(alpha: 0.7),
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.95),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -308,43 +330,67 @@ class _ModernInputBarState extends State<ModernInputBar>
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: List.generate(_audioLevels.length, (index) {
-              final height = 10.0 + _audioLevels[index] * 40;
+              final height = 12.0 + _audioLevels[index] * 36;
               return AnimatedContainer(
-                duration: const Duration(milliseconds: 50),
-                width: 3,
+                duration: const Duration(milliseconds: 100),
+                curve: Curves.easeOut,
+                width: 4,
                 height: height,
-                margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                margin: const EdgeInsets.symmetric(horizontal: 3),
                 decoration: BoxDecoration(
-                  color: _isCancelZone
-                      ? const Color(0xFFF56565)
-                      : const Color(0xFF0EA5E9),
-                  borderRadius: BorderRadius.circular(1.5),
+                  gradient: _isCancelZone
+                      ? const LinearGradient(
+                          colors: [Color(0xFFF56565), Color(0xFFFC8181)],
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                        )
+                      : const LinearGradient(
+                          colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                        ),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               );
             }),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
           // 录音时长
           Text(
             _formatDuration(_recordingSeconds),
             style: const TextStyle(
-              fontSize: 16,
-              color: Colors.white,
+              fontSize: 24,
+              color: Color(0xFF2D3748),
               fontWeight: FontWeight.w600,
+              letterSpacing: 1.2,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
 
           // 提示文字
-          Text(
-            _isCancelZone ? '松开手指，取消发送' : '上滑取消',
-            style: TextStyle(
-              fontSize: 13,
-              color: _isCancelZone
-                  ? const Color(0xFFF56565)
-                  : Colors.white.withValues(alpha: 0.8),
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                _isCancelZone ? Icons.cancel_outlined : Icons.arrow_upward_rounded,
+                size: 16,
+                color: _isCancelZone
+                    ? const Color(0xFFF56565)
+                    : const Color(0xFF718096),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                _isCancelZone ? '松开取消发送' : '上滑取消',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: _isCancelZone
+                      ? const Color(0xFFF56565)
+                      : const Color(0xFF718096),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
         ],
       ),

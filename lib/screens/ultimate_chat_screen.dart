@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'dart:async';
 import '../models/message.dart';
 import '../services/ai_service.dart';
+import '../services/settings_service.dart';
 import '../widgets/enhanced_message_bubble.dart';
 import '../widgets/modern_input_bar.dart';
 import 'ultimate_settings_screen.dart';
@@ -37,14 +38,60 @@ class _UltimateChatScreenState extends State<UltimateChatScreen> {
 
   // 设置参数
   String _systemPrompt = '你是一个有帮助的AI助手。';
+  double _temperature = 1.0;
+  int _topK = 64;
+  double _topP = 0.95;
+  int _maxTokens = 8192;
   bool _enableTts = true;
   bool _autoPlayTts = false;
+  String _ttsLanguage = 'zh-CN';
+  bool _enableTranslation = false;
+  String _translationMode = 'auto';
+  bool _showTimestamp = true;
+  bool _userScrolling = false;
 
   @override
   void initState() {
     super.initState();
+    _initSettings();
     _initTts();
     _addWelcomeMessage();
+    _scrollController.addListener(_onScroll);
+  }
+
+  Future<void> _initSettings() async {
+    await SettingsService.instance.initialize();
+    setState(() {
+      _systemPrompt = SettingsService.instance.loadSystemPrompt();
+      final modelParams = SettingsService.instance.loadModelParams();
+      _temperature = modelParams['temperature'];
+      _topK = modelParams['topK'];
+      _topP = modelParams['topP'];
+      _maxTokens = modelParams['maxTokens'];
+
+      final ttsSettings = SettingsService.instance.loadTtsSettings();
+      _enableTts = ttsSettings['enableTts'];
+      _autoPlayTts = ttsSettings['autoPlay'];
+      _ttsLanguage = ttsSettings['language'];
+
+      final translationSettings = SettingsService.instance.loadTranslationSettings();
+      _enableTranslation = translationSettings['enable'];
+      _translationMode = translationSettings['mode'];
+
+      final displaySettings = SettingsService.instance.loadDisplaySettings();
+      _showMetrics = displaySettings['showMetrics'];
+      _showTimestamp = displaySettings['showTimestamp'];
+    });
+  }
+
+  void _onScroll() {
+    if (_scrollController.hasClients) {
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      final currentScroll = _scrollController.position.pixels;
+      setState(() {
+        _userScrolling = currentScroll < maxScroll - 100;
+      });
+    }
   }
 
   @override
@@ -73,7 +120,7 @@ class _UltimateChatScreenState extends State<UltimateChatScreen> {
   }
 
   Future<void> _initTts() async {
-    await _flutterTts.setLanguage('zh-CN');
+    await _flutterTts.setLanguage(_ttsLanguage);
     await _flutterTts.setSpeechRate(0.5);
     await _flutterTts.setVolume(1.0);
     await _flutterTts.setPitch(1.0);
@@ -116,10 +163,31 @@ class _UltimateChatScreenState extends State<UltimateChatScreen> {
     _scrollToBottom();
 
     try {
-      // 使用流式输出
+      // 构建最终的系统提示词（包含翻译功能）
+      String? finalSystemPrompt = _systemPrompt;
+      if (_enableTranslation) {
+        switch (_translationMode) {
+          case 'zh-en':
+            finalSystemPrompt = '你是专业翻译，将中文翻译成英文。只返回翻译结果，不要解释。';
+            break;
+          case 'en-zh':
+            finalSystemPrompt = '你是专业翻译，将英文翻译成中文。只返回翻译结果，不要解释。';
+            break;
+          case 'auto':
+            finalSystemPrompt = '你是专业翻译，自动识别语言并翻译（中文→英文，英文→中文）。只返回翻译结果，不要解释。';
+            break;
+        }
+      }
+
+      // 使用流式输出，传递所有参数
       await for (final chunk in AIService.instance.sendMessageStream(
         msgText,
         imageBytes: finalImage,
+        systemPrompt: finalSystemPrompt,
+        temperature: _temperature,
+        topK: _topK,
+        topP: _topP,
+        maxTokens: _maxTokens,
       )) {
         if (mounted) {
           setState(() {
@@ -136,7 +204,9 @@ class _UltimateChatScreenState extends State<UltimateChatScreen> {
               _tokensPerSecond = _totalTokens / elapsed.inMilliseconds * 1000;
             }
           });
-          _scrollToBottom();
+          if (!_userScrolling) {
+            _scrollToBottom();
+          }
         }
       }
 
@@ -161,9 +231,17 @@ class _UltimateChatScreenState extends State<UltimateChatScreen> {
     }
   }
 
-  Future<void> _handleVoiceRecorded(String voicePath) async {
+  Future<void> _handleVoiceRecorded(String voicePath, int duration) async {
+    setState(() {
+      _messages.add(Message.withAudio(
+        text: '语音消息',
+        audioPath: voicePath,
+        isUser: true,
+        duration: duration,
+      ));
+    });
+    _scrollToBottom();
     // TODO: 实现语音识别
-    await _sendMessage(text: '[语音消息: $voicePath]');
   }
 
   Future<void> _pickImage(ImageSource source) async {
