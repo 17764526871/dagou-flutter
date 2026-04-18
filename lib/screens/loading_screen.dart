@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 import '../services/ai_service.dart';
-import 'chat_screen.dart';
+import 'enhanced_chat_screen.dart';
 
 class LoadingScreen extends StatefulWidget {
   const LoadingScreen({super.key});
@@ -48,7 +48,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
       // 导航到聊天界面
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const ChatScreen()),
+          MaterialPageRoute(builder: (_) => const EnhancedChatScreen()),
         );
       }
     } catch (e) {
