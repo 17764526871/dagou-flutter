@@ -3,21 +3,21 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'dart:typed_data';
 import 'dart:async';
-import '../models/message.dart';
-import '../services/ai_service.dart';
-import '../services/settings_service.dart';
-import '../widgets/enhanced_message_bubble.dart';
-import '../widgets/modern_input_bar.dart';
-import 'ultimate_settings_screen.dart';
+import '../../../data/models/message.dart';
+import '../../../services/ai/ai_service.dart';
+import '../../../services/storage/settings_service.dart';
+import '../../widgets/chat/message_bubble.dart';
+import '../../widgets/chat/input_bar.dart';
+import '../settings/settings_screen.dart';
 
-class UltimateChatScreen extends StatefulWidget {
-  const UltimateChatScreen({super.key});
+class ChatScreen extends StatefulWidget {
+  const ChatScreen({super.key});
 
   @override
-  State<UltimateChatScreen> createState() => _UltimateChatScreenState();
+  State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _UltimateChatScreenState extends State<UltimateChatScreen> {
+class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<Message> _messages = [];
@@ -29,11 +29,15 @@ class _UltimateChatScreenState extends State<UltimateChatScreen> {
   String _streamingText = '';
   Uint8List? _pendingImage;
   bool _showImagePreview = false;
+  StreamSubscription<String>? _streamSubscription;
 
   // 性能指标
   int _totalTokens = 0;
   double _tokensPerSecond = 0.0;
   DateTime? _inferenceStartTime;
+  DateTime? _inferenceEndTime;
+  int _totalCharacters = 0;
+  double _averageLatency = 0.0;
   bool _showMetrics = true;
 
   // 设置参数
@@ -98,6 +102,7 @@ class _UltimateChatScreenState extends State<UltimateChatScreen> {
   void dispose() {
     _textController.dispose();
     _scrollController.dispose();
+    _streamSubscription?.cancel();
     _flutterTts.stop();
     super.dispose();
   }
@@ -120,10 +125,36 @@ class _UltimateChatScreenState extends State<UltimateChatScreen> {
   }
 
   Future<void> _initTts() async {
-    await _flutterTts.setLanguage(_ttsLanguage);
-    await _flutterTts.setSpeechRate(0.5);
-    await _flutterTts.setVolume(1.0);
-    await _flutterTts.setPitch(1.0);
+    try {
+      await _flutterTts.setLanguage(_ttsLanguage);
+      await _flutterTts.setSpeechRate(0.5);
+      await _flutterTts.setVolume(1.0);
+      await _flutterTts.setPitch(1.0);
+
+      // 设置完成回调
+      _flutterTts.setCompletionHandler(() {
+        // TTS 播放完成
+      });
+
+      _flutterTts.setErrorHandler((msg) {
+        print('TTS 错误: $msg');
+      });
+    } catch (e) {
+      print('TTS 初始化失败: $e');
+    }
+  }
+
+  Future<void> _playTts(String text) async {
+    if (!_enableTts || text.isEmpty) return;
+
+    try {
+      // 停止当前播放
+      await _flutterTts.stop();
+      // 开始新的播放
+      await _flutterTts.speak(text);
+    } catch (e) {
+      print('TTS 播放失败: $e');
+    }
   }
 
   Future<void> _sendMessage({String? text, Uint8List? imageBytes}) async {
@@ -138,8 +169,11 @@ class _UltimateChatScreenState extends State<UltimateChatScreen> {
       _pendingImage = null;
       _showImagePreview = false;
       _inferenceStartTime = DateTime.now();
+      _inferenceEndTime = null;
       _totalTokens = 0;
+      _totalCharacters = 0;
       _tokensPerSecond = 0.0;
+      _averageLatency = 0.0;
     });
 
     Message userMsg;
@@ -199,9 +233,11 @@ class _UltimateChatScreenState extends State<UltimateChatScreen> {
 
             // 更新性能指标
             _totalTokens++;
+            _totalCharacters = _streamingText.length;
             if (_inferenceStartTime != null) {
               final elapsed = DateTime.now().difference(_inferenceStartTime!);
               _tokensPerSecond = _totalTokens / elapsed.inMilliseconds * 1000;
+              _averageLatency = elapsed.inMilliseconds / _totalTokens;
             }
           });
           if (!_userScrolling) {
@@ -213,6 +249,7 @@ class _UltimateChatScreenState extends State<UltimateChatScreen> {
       setState(() {
         _isSending = false;
         _streamingMessageIndex = null;
+        _inferenceEndTime = DateTime.now();
       });
 
       // 自动播报
@@ -241,7 +278,15 @@ class _UltimateChatScreenState extends State<UltimateChatScreen> {
       ));
     });
     _scrollToBottom();
-    // TODO: 实现语音识别
+
+    // 直接回复语音消息（暂不支持语音识别）
+    setState(() {
+      _messages.add(Message.text(
+        text: '抱歉，当前版本暂不支持语音识别。请使用文字或图片输入。',
+        isUser: false,
+      ));
+    });
+    _scrollToBottom();
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -259,19 +304,21 @@ class _UltimateChatScreenState extends State<UltimateChatScreen> {
     }
   }
 
-  Future<void> _playTts(String text) async {
-    if (_enableTts) {
-      await _flutterTts.speak(text);
-    }
-  }
-
   void _cancelSending() {
+    _streamSubscription?.cancel();
+    _streamSubscription = null;
+
     setState(() {
       _isSending = false;
-      if (_streamingMessageIndex != null) {
+      if (_streamingMessageIndex != null && _streamingText.isNotEmpty) {
+        // 保留已生成的部分内容
+        _messages[_streamingMessageIndex!] =
+            Message.text(text: '$_streamingText\n\n[已停止生成]', isUser: false);
+      } else if (_streamingMessageIndex != null) {
+        // 如果没有内容，删除消息
         _messages.removeAt(_streamingMessageIndex!);
-        _streamingMessageIndex = null;
       }
+      _streamingMessageIndex = null;
       _streamingText = '';
     });
   }
@@ -300,19 +347,16 @@ class _UltimateChatScreenState extends State<UltimateChatScreen> {
   }
 
   Future<void> _openSettings() async {
-    final result = await Navigator.push<Map<String, dynamic>>(
+    await Navigator.push<Map<String, dynamic>>(
       context,
-      MaterialPageRoute(builder: (_) => const UltimateSettingsScreen()),
+      MaterialPageRoute(builder: (_) => const SettingsScreen()),
     );
 
-    if (result != null) {
-      setState(() {
-        _systemPrompt = result['systemPrompt'] ?? _systemPrompt;
-        _enableTts = result['enableTts'] ?? _enableTts;
-        _autoPlayTts = result['autoPlayTts'] ?? _autoPlayTts;
-        _showMetrics = result['showMetrics'] ?? _showMetrics;
-      });
-    }
+    // 设置界面返回后重新加载所有设置
+    await _initSettings();
+
+    // 重新初始化 TTS（语言可能已更改）
+    await _initTts();
   }
 
   @override
@@ -335,14 +379,7 @@ class _UltimateChatScreenState extends State<UltimateChatScreen> {
                     itemCount: _messages.length,
                     itemBuilder: (context, index) {
                       final message = _messages[index];
-                      final isStreaming = index == _streamingMessageIndex;
-                      return EnhancedMessageBubble(
-                        message: message,
-                        isThinking: isStreaming,
-                        onTtsPlay: !message.isUser && message.text.isNotEmpty
-                            ? () => _playTts(message.text)
-                            : null,
-                      );
+                      return MessageBubble(message: message);
                     },
                   ),
           ),
@@ -352,7 +389,7 @@ class _UltimateChatScreenState extends State<UltimateChatScreen> {
             _buildImagePreview(),
 
           // 输入栏
-          ModernInputBar(
+          InputBar(
             controller: _textController,
             onSend: _isSending ? () {} : () => _sendMessage(),
             onVoiceRecorded: _handleVoiceRecorded,
@@ -456,11 +493,21 @@ class _UltimateChatScreenState extends State<UltimateChatScreen> {
             value: _totalTokens.toString(),
           ),
           _buildMetricItem(
+            icon: Icons.text_fields,
+            label: '字符',
+            value: _totalCharacters.toString(),
+          ),
+          _buildMetricItem(
             icon: Icons.timer,
             label: '时长',
             value: _inferenceStartTime != null
                 ? '${DateTime.now().difference(_inferenceStartTime!).inSeconds}s'
                 : '0s',
+          ),
+          _buildMetricItem(
+            icon: Icons.access_time,
+            label: '延迟',
+            value: '${_averageLatency.toStringAsFixed(0)}ms',
           ),
         ],
       ),
@@ -543,13 +590,41 @@ class _UltimateChatScreenState extends State<UltimateChatScreen> {
             ],
           ),
           const SizedBox(width: 12),
-          const Expanded(
-            child: Text(
-              '图片已选择，输入问题后发送',
-              style: TextStyle(
-                fontSize: 13,
-                color: Color(0xFF718096),
-              ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  '图片已选择',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF718096),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                GestureDetector(
+                  onTap: _isSending ? null : () => _sendMessage(),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      '直接发送',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

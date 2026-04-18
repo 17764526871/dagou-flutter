@@ -1,10 +1,12 @@
 import 'dart:typed_data';
 import 'package:flutter_gemma/flutter_gemma.dart';
+import 'model_manager.dart';
 
 class AIService {
   static final AIService instance = AIService._internal();
   AIService._internal();
 
+  final ModelManager _modelManager = ModelManager.instance;
   InferenceChat? _chat;
   bool _isInitialized = false;
 
@@ -36,27 +38,28 @@ class AIService {
 
       print('✅ 模型安装完成');
 
-      // 步骤 2: 创建模型实例
-      final model = await FlutterGemma.getActiveModel(
+      // 步骤 2: 通过 ModelManager 初始化模型
+      await _modelManager.switchModel(
+        'gemma-4-e2b',
+        backend: PreferredBackend.gpu,
         maxTokens: 8192,
-        supportImage: true,  // 支持图片输入
-        maxNumImages: 1,
-        supportAudio: true,  // 支持音频输入
-        preferredBackend: PreferredBackend.gpu,
       );
 
       print('✅ 模型实例创建完成');
 
       // 步骤 3: 创建聊天会话
-      _chat = await model.createChat(
-        temperature: 1.0,
-        topK: 64,
-        topP: 0.95,
-        randomSeed: 42,
-        tokenBuffer: 512,
-        supportImage: true,
-        supportAudio: true,
-      );
+      final model = _modelManager.currentModel;
+      if (model != null) {
+        _chat = await model.createChat(
+          temperature: 1.0,
+          topK: 64,
+          topP: 0.95,
+          randomSeed: 42,
+          tokenBuffer: 512,
+          supportImage: true,
+          supportAudio: true,
+        );
+      }
 
       _isInitialized = true;
       print('✅ Gemma 4 E2B 端侧多模态模型初始化成功！');
@@ -120,8 +123,14 @@ class AIService {
     }
 
     try {
-      // 如果提供了新的模型参数，需要重新创建聊天会话
-      if (temperature != null || topK != null || topP != null || maxTokens != null) {
+      // 如果提供了新的模型参数或系统提示词，需要重新创建聊天会话
+      final needRecreate = temperature != null ||
+                          topK != null ||
+                          topP != null ||
+                          maxTokens != null ||
+                          systemPrompt != null;
+
+      if (needRecreate) {
         _temperature = temperature ?? _temperature;
         _topK = topK ?? _topK;
         _topP = topP ?? _topP;
@@ -145,23 +154,26 @@ class AIService {
           supportImage: true,
           supportAudio: true,
         );
+
+        // 如果提供了系统提示词，作为第一条消息添加
+        if (systemPrompt != null && systemPrompt.isNotEmpty) {
+          final systemMessage = Message(
+            text: systemPrompt,
+            isUser: false,
+          );
+          await _chat!.addQuery(systemMessage);
+        }
       }
 
-      // 如果提供了系统提示词，在用户消息前添加
-      String finalText = text;
-      if (systemPrompt != null && systemPrompt.isNotEmpty) {
-        finalText = '$systemPrompt\n\n用户: $text';
-      }
-
-      // 创建消息
+      // 创建用户消息
       final message = imageBytes != null
           ? Message(
-              text: finalText,
+              text: text,
               imageBytes: imageBytes,
               isUser: true,
             )
           : Message(
-              text: finalText,
+              text: text,
               isUser: true,
             );
 
@@ -180,7 +192,35 @@ class AIService {
   }
 
   /// 获取当前模型信息
-  String getCurrentModel() => 'Gemma 4 E2B (2B 参数，多模态：文本+图片+音频)';
+  String getCurrentModel() {
+    final modelInfo = _modelManager.currentModelInfo;
+    return modelInfo?.name ?? 'Gemma 4 E2B (2B 参数，多模态：文本+图片+音频)';
+  }
+
+  /// 获取当前模型能力
+  List<String> getCurrentModelCapabilities() {
+    final modelInfo = _modelManager.currentModelInfo;
+    return modelInfo?.capabilities ?? ['text', 'image', 'audio'];
+  }
+
+  /// 切换模型
+  Future<void> switchModel(String modelId, {PreferredBackend? backend}) async {
+    await _modelManager.switchModel(modelId, backend: backend);
+
+    // 重新创建聊天会话
+    final model = _modelManager.currentModel;
+    if (model != null) {
+      _chat = await model.createChat(
+        temperature: _temperature,
+        topK: _topK,
+        topP: _topP,
+        randomSeed: 42,
+        tokenBuffer: 512,
+        supportImage: _modelManager.currentModelInfo?.supportsImage ?? false,
+        supportAudio: _modelManager.currentModelInfo?.supportsAudio ?? false,
+      );
+    }
+  }
 
   /// 清除聊天历史
   void clearHistory() {

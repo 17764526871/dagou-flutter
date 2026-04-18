@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
-import '../services/ai_service.dart';
-import 'ultimate_chat_screen.dart';
+import '../../../services/ai/ai_service.dart';
+import '../chat/chat_screen.dart';
 
-class EnhancedLoadingScreen extends StatefulWidget {
-  const EnhancedLoadingScreen({super.key});
+class LoadingScreen extends StatefulWidget {
+  const LoadingScreen({super.key});
 
   @override
-  State<EnhancedLoadingScreen> createState() => _EnhancedLoadingScreenState();
+  State<LoadingScreen> createState() => _LoadingScreenState();
 }
 
-class _EnhancedLoadingScreenState extends State<EnhancedLoadingScreen>
+class _LoadingScreenState extends State<LoadingScreen>
     with TickerProviderStateMixin {
   String _statusMessage = '正在初始化...';
   double _progress = 0.0;
@@ -45,15 +45,18 @@ class _EnhancedLoadingScreenState extends State<EnhancedLoadingScreen>
       // 步骤 2: 加载模型文件
       setState(() {
         _statusMessage = '正在加载 Gemma 4 E2B 模型...';
-        _progress = 0.3;
+        _progress = 0.25;
       });
       await Future.delayed(const Duration(milliseconds: 500));
 
-      // 步骤 3: 初始化模型
+      // 步骤 3: 初始化模型（这是最耗时的步骤）
       setState(() {
         _statusMessage = '正在初始化 AI 模型...';
-        _progress = 0.5;
+        _progress = 0.4;
       });
+
+      // 模拟进度更新
+      _simulateProgress(0.4, 0.85, 10000); // 10秒内从40%到85%
 
       // 实际初始化
       await AIService.instance.initialize();
@@ -61,7 +64,7 @@ class _EnhancedLoadingScreenState extends State<EnhancedLoadingScreen>
       // 步骤 4: 配置参数
       setState(() {
         _statusMessage = '正在配置模型参数...';
-        _progress = 0.8;
+        _progress = 0.9;
       });
       await Future.delayed(const Duration(milliseconds: 300));
 
@@ -78,7 +81,7 @@ class _EnhancedLoadingScreenState extends State<EnhancedLoadingScreen>
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) =>
-                const UltimateChatScreen(),
+                const ChatScreen(),
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
               const begin = Offset(1.0, 0.0);
               const end = Offset.zero;
@@ -121,6 +124,22 @@ class _EnhancedLoadingScreenState extends State<EnhancedLoadingScreen>
           ),
         );
       }
+    }
+  }
+
+  void _simulateProgress(double start, double end, int durationMs) {
+    final steps = 20;
+    final stepDuration = durationMs ~/ steps;
+    final increment = (end - start) / steps;
+
+    for (int i = 0; i < steps; i++) {
+      Future.delayed(Duration(milliseconds: stepDuration * i), () {
+        if (mounted && _progress < end) {
+          setState(() {
+            _progress = start + (increment * (i + 1));
+          });
+        }
+      });
     }
   }
 

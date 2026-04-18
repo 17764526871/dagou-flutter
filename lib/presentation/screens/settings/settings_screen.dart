@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
-import '../services/settings_service.dart';
-import '../services/cache_service.dart';
+import 'package:flutter_gemma/flutter_gemma.dart';
+import '../../../services/storage/settings_service.dart';
+import '../../../services/storage/cache_service.dart';
+import '../../../services/ai/model_manager.dart';
+import '../models/model_list_screen.dart';
 
-class UltimateSettingsScreen extends StatefulWidget {
-  const UltimateSettingsScreen({super.key});
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({super.key});
 
   @override
-  State<UltimateSettingsScreen> createState() => _UltimateSettingsScreenState();
+  State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _UltimateSettingsScreenState extends State<UltimateSettingsScreen> {
+class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _systemPromptController = TextEditingController();
 
   // 模型参数
@@ -197,6 +200,46 @@ class _UltimateSettingsScreenState extends State<UltimateSettingsScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           _buildSection(
+            title: '模型管理',
+            children: [
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0EA5E9).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.memory,
+                    color: Color(0xFF0EA5E9),
+                  ),
+                ),
+                title: const Text(
+                  '模型列表',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                subtitle: const Text(
+                  '查看和切换 AI 模型',
+                  style: TextStyle(fontSize: 13),
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ModelListScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          _buildSection(
             title: '系统提示词',
             children: [
               Padding(
@@ -316,6 +359,37 @@ class _UltimateSettingsScreenState extends State<UltimateSettingsScreen> {
                   {'value': 'en-US', 'label': 'English'},
                 ],
                 onChanged: (value) => setState(() => _ttsLanguage = value!),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          _buildSection(
+            title: '高级设置',
+            children: [
+              _buildDropdown(
+                label: '推理后端',
+                value: ModelManager.instance.currentBackend == PreferredBackend.gpu ? 'gpu' : 'cpu',
+                items: const [
+                  {'value': 'gpu', 'label': 'GPU（推荐）'},
+                  {'value': 'cpu', 'label': 'CPU'},
+                ],
+                onChanged: (value) async {
+                  final backend = value == 'gpu' ? PreferredBackend.gpu : PreferredBackend.cpu;
+                  final currentModelId = ModelManager.instance.currentModelId;
+                  if (currentModelId != null) {
+                    await ModelManager.instance.switchModel(currentModelId, backend: backend);
+                    setState(() {});
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('已切换到 ${value == 'gpu' ? 'GPU' : 'CPU'} 后端'),
+                          backgroundColor: const Color(0xFF48BB78),
+                        ),
+                      );
+                    }
+                  }
+                },
               ),
             ],
           ),

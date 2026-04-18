@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import '../services/audio_service.dart';
+import '../../../services/audio/audio_service.dart';
 
-class ModernInputBar extends StatefulWidget {
+class InputBar extends StatefulWidget {
   final TextEditingController controller;
   final VoidCallback onSend;
   final Function(String, int) onVoiceRecorded;
@@ -10,7 +10,7 @@ class ModernInputBar extends StatefulWidget {
   final VoidCallback onImagePick;
   final bool isSending;
 
-  const ModernInputBar({
+  const InputBar({
     super.key,
     required this.controller,
     required this.onSend,
@@ -21,10 +21,10 @@ class ModernInputBar extends StatefulWidget {
   });
 
   @override
-  State<ModernInputBar> createState() => _ModernInputBarState();
+  State<InputBar> createState() => _InputBarState();
 }
 
-class _ModernInputBarState extends State<ModernInputBar>
+class _InputBarState extends State<InputBar>
     with TickerProviderStateMixin {
   bool _isVoiceMode = false;
   bool _isRecording = false;
