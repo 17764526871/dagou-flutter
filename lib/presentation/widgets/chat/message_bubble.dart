@@ -251,8 +251,8 @@ class MessageBubble extends StatelessWidget {
             ),
           ),
         ],
-        // 重发按钮（仅用户消息，且非音频消息）
-        if (isUser && onResend != null && message.type != MessageType.audio) ...[
+        // 重发按钮（仅用户消息）
+        if (isUser && onResend != null) ...[
           const SizedBox(width: 6),
           InkWell(
             onTap: onResend,

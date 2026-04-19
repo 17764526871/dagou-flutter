@@ -420,7 +420,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: '关于',
             icon: Icons.info_outline_rounded,
             children: [
-              _buildInfoRow('版本', 'v1.1.1'),
+              _buildInfoRow('版本', 'v1.1.2'),
               _buildInfoRow('模型', 'Gemma 4 E2B (2B)'),
               _buildInfoRow('运行模式', '端侧离线'),
             ],

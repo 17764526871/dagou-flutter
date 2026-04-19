@@ -296,7 +296,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (idx != null && idx < _messages.length) {
         if (partialText.isNotEmpty) {
           _messages[idx] = Message.text(
-            text: '$partialText\n\n[已停止生成]',
+            text: '$partialText\n\n[已取消生成]',
             isUser: false,
           );
         } else {

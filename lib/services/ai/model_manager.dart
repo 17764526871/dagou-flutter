@@ -1,6 +1,10 @@
 import 'package:flutter_gemma/flutter_gemma.dart';
 import '../../data/models/ai_model_info.dart';
 import 'package:flutter/foundation.dart';
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
+import 'dart:async';
 
 class ModelManager {
   static final ModelManager _instance = ModelManager._internal();
@@ -73,23 +77,58 @@ class ModelManager {
   ];
 
   /// 下载模型（真实下载）
-  /// 注意：flutter_gemma 当前版本主要支持从 assets 加载
-  /// 网络下载需要先下载文件到本地，然后使用 fromFile 安装
   Stream<double> downloadModel(String modelId, String url) async* {
+    final controller = StreamController<double>();
+
     try {
       debugPrint('📥 开始下载模型: $modelId from $url');
-      debugPrint('⚠️  当前版本暂不支持直接从网络下载');
-      debugPrint('💡 建议：将模型文件放入 assets/ 目录后使用 fromAsset 安装');
 
-      // 模拟下载进度（实际需要实现 HTTP 下载 + fromFile 安装）
-      for (int i = 0; i <= 100; i += 10) {
-        await Future.delayed(const Duration(milliseconds: 200));
-        yield i / 100.0;
+      // 获取应用文档目录
+      final appDir = await getApplicationDocumentsDirectory();
+      final modelsDir = Directory('${appDir.path}/models');
+      if (!await modelsDir.exists()) {
+        await modelsDir.create(recursive: true);
       }
 
-      debugPrint('✅ 模型下载完成（模拟）: $modelId');
+      // 确定文件名
+      final fileName = url.split('/').last;
+      final filePath = '${modelsDir.path}/$fileName';
+
+      // 如果文件已存在，先删除
+      final file = File(filePath);
+      if (await file.exists()) {
+        await file.delete();
+      }
+
+      // 使用 Dio 下载文件
+      final dio = Dio();
+
+      await dio.download(
+        url,
+        filePath,
+        onReceiveProgress: (received, total) {
+          if (total != -1) {
+            final progress = received / total;
+            controller.add(progress);
+            debugPrint('📥 下载进度: ${(progress * 100).toStringAsFixed(1)}%');
+          }
+        },
+        options: Options(
+          receiveTimeout: const Duration(minutes: 30),
+          sendTimeout: const Duration(minutes: 30),
+        ),
+      );
+
+      debugPrint('✅ 模型下载完成: $modelId');
+      debugPrint('📁 文件路径: $filePath');
+
+      controller.add(1.0);
+      await controller.close();
+
+      yield* controller.stream;
     } catch (e) {
       debugPrint('❌ 模型下载失败: $e');
+      await controller.close();
       rethrow;
     }
   }

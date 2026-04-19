@@ -348,7 +348,7 @@ class _InputBarState extends State<InputBar> with TickerProviderStateMixin {
           borderRadius: BorderRadius.circular(22),
         ),
         child: const Text(
-          '停止',
+          '取消',
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w500,
