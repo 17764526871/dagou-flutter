@@ -9,7 +9,9 @@
       "Bash(curl -s http://localhost:8080/api/models)",
       "Bash(git commit -m 'docs: 添加服务器启动脚本和使用说明 *)",
       "Bash(git commit -m 'docs: 添加快速参考文档 *)",
-      "Bash(git commit -m 'docs: 添加项目完成总结 *)"
+      "Bash(git commit -m 'docs: 添加项目完成总结 *)",
+      "Bash(git commit -m 'docs: 添加问题解答总结 *)",
+      "Bash(git commit -m 'docs: 添加快速开始指南 *)"
     ],
     "additionalDirectories": [
       "U:\\DG model",
