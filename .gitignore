@@ -51,10 +51,11 @@ lib/config/app_config.dart
 secrets.json
 api_keys.json
 
-# 大模型文件 - 使用 Git LFS 管理
-# 已配置 .gitattributes 使用 LFS 跟踪这些文件
-# assets/models/*.litertlm
-# assets/models/*.task
-# assets/models/*.bin
-# assets/models/*.gguf
+# 大模型文件 - 忽略不提交（文件太大，超过 GitHub 限制）
+assets/models/*.litertlm
+assets/models/*.task
+assets/models/*.bin
+assets/models/*.gguf
+
+.claude/
 
