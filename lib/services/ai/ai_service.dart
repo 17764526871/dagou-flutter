@@ -23,11 +23,15 @@ class AIService {
   bool get isInitialized => _isInitialized;
 
   /// 初始化 Gemma 4 E2B 端侧多模态模型
-  Future<void> initialize() async {
+  Future<void> initialize({String? modelPath}) async {
     if (_isInitialized) return;
 
     try {
       debugPrint('🔄 开始初始化 Gemma 4 E2B 端侧多模态模型...');
+
+      if (modelPath != null) {
+        debugPrint('📁 使用指定路径加载模型: $modelPath');
+      }
 
       debugPrint('✅ 模型安装完成');
 
@@ -35,6 +39,7 @@ class AIService {
         'gemma-4-e2b',
         backend: PreferredBackend.gpu,
         maxTokens: 8192,
+        customPath: modelPath,
       );
 
       debugPrint('✅ 模型实例创建完成');

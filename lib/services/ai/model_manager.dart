@@ -195,6 +195,7 @@ class ModelManager {
     String modelId, {
     PreferredBackend? backend,
     int? maxTokens,
+    String? customPath,
   }) async {
     final modelInfo = availableModels.firstWhere(
       (m) => m.id == modelId,
@@ -204,8 +205,17 @@ class ModelManager {
     // 释放当前模型（如果存在）
     _currentModel = null;
 
-    // 设置为当前激活模型（如果已安装会跳过下载）
-    if (modelInfo.isBuiltIn && modelInfo.localPath != null) {
+    // 优先使用自定义路径
+    if (customPath != null) {
+      debugPrint('📁 使用自定义路径加载模型: $customPath');
+      await FlutterGemma.installModel(
+        modelType: modelInfo.modelType,
+        fileType: modelInfo.fileType,
+      )
+      .fromFile(customPath)
+      .install();
+    } else if (modelInfo.isBuiltIn && modelInfo.localPath != null) {
+      // 设置为当前激活模型（如果已安装会跳过下载）
       await FlutterGemma.installModel(
         modelType: modelInfo.modelType,
         fileType: modelInfo.fileType,

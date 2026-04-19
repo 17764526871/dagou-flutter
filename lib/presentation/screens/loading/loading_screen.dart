@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 import '../../../services/ai/ai_service.dart';
+import '../../../services/storage/model_path_service.dart';
+import '../../../services/storage/file_picker_service.dart';
 import '../chat/chat_screen.dart';
 
 class LoadingScreen extends StatefulWidget {
@@ -49,21 +51,56 @@ class _LoadingScreenState extends State<LoadingScreen>
       });
       await Future.delayed(const Duration(milliseconds: 300));
 
-      // 步骤 2: 加载模型文件
+      // 步骤 2: 查找模型文件
       setState(() {
-        _statusMessage = '正在加载 Gemma 4 E2B 模型...';
-        _progress = 0.25;
+        _statusMessage = '正在查找模型文件...';
+        _progress = 0.2;
+      });
+
+      final modelPathService = ModelPathService.instance;
+      await modelPathService.initialize();
+
+      String? modelPath = await modelPathService.findModelFile('gemma-4-E2B-it.litertlm');
+
+      // 如果未找到模型，显示选择对话框
+      if (modelPath == null) {
+        if (mounted) {
+          final selectedPath = await _showModelSelectionDialog();
+          if (selectedPath != null) {
+            modelPath = selectedPath;
+            await modelPathService.saveCustomModelPath(selectedPath);
+          } else {
+            throw Exception('未选择模型文件');
+          }
+        }
+      }
+
+      // 步骤 3: 验证模型文件
+      setState(() {
+        _statusMessage = '正在验证模型文件...';
+        _progress = 0.3;
+      });
+
+      final isValid = await modelPathService.validateModelFile(modelPath!);
+      if (!isValid) {
+        throw Exception('模型文件验证失败，请检查文件是否完整');
+      }
+
+      // 步骤 4: 加载模型文件
+      setState(() {
+        _statusMessage = '正在加载模型文件...';
+        _progress = 0.4;
       });
       await Future.delayed(const Duration(milliseconds: 500));
 
-      // 步骤 3: 初始化模型（这是最耗时的步骤）
+      // 步骤 5: 初始化模型（这是最耗时的步骤）
       setState(() {
         _statusMessage = '正在初始化 AI 模型...';
-        _progress = 0.4;
+        _progress = 0.5;
       });
 
       // 使用动画控制器平滑更新进度
-      final animation = Tween<double>(begin: 0.4, end: 0.85).animate(
+      final animation = Tween<double>(begin: 0.5, end: 0.85).animate(
         CurvedAnimation(
           parent: _progressController,
           curve: Curves.easeInOut,
@@ -80,20 +117,20 @@ class _LoadingScreenState extends State<LoadingScreen>
 
       _progressController.forward();
 
-      // 实际初始化
-      await AIService.instance.initialize();
+      // 实际初始化（传入模型路径）
+      await AIService.instance.initialize(modelPath: modelPath);
 
       // 停止动画
       _progressController.stop();
 
-      // 步骤 4: 配置参数
+      // 步骤 6: 配置参数
       setState(() {
         _statusMessage = '正在配置模型参数...';
         _progress = 0.9;
       });
       await Future.delayed(const Duration(milliseconds: 300));
 
-      // 步骤 5: 完成
+      // 步骤 7: 完成
       setState(() {
         _statusMessage = '初始化完成！';
         _progress = 1.0;
@@ -136,7 +173,7 @@ class _LoadingScreenState extends State<LoadingScreen>
               borderRadius: BorderRadius.circular(20),
             ),
             title: const Text('初始化失败'),
-            content: Text('无法初始化 Gemma 4 模型：\n\n$e\n\n请重试。'),
+            content: Text('无法初始化 Gemma 4 模型：\n\n$e\n\n请检查模型文件是否存在。'),
             actions: [
               TextButton(
                 onPressed: () {
@@ -145,11 +182,62 @@ class _LoadingScreenState extends State<LoadingScreen>
                 },
                 child: const Text('重试'),
               ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  final selectedPath = await _showModelSelectionDialog();
+                  if (selectedPath != null) {
+                    await ModelPathService.instance.saveCustomModelPath(selectedPath);
+                    _initializeApp();
+                  }
+                },
+                child: const Text('选择模型'),
+              ),
             ],
           ),
         );
       }
     }
+  }
+
+  Future<String?> _showModelSelectionDialog() async {
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: const Text('选择模型文件'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('未找到内置模型文件，请选择模型文件位置：'),
+            const SizedBox(height: 16),
+            const Text(
+              '支持的文件格式:\n• .litertlm\n• .task',
+              style: TextStyle(fontSize: 13, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final filePath = await FilePickerService.instance.pickModelFile();
+              if (filePath != null && mounted) {
+                Navigator.of(context).pop(filePath);
+              }
+            },
+            child: const Text('选择文件'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
