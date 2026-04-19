@@ -235,22 +235,6 @@ class MessageBubble extends StatelessWidget {
           _formatTime(message.timestamp),
           style: const TextStyle(color: Color(0xFFB0BEC5), fontSize: 11),
         ),
-        // TTS 按钮
-        if (!isUser && onTtsPlay != null) ...[
-          const SizedBox(width: 6),
-          InkWell(
-            onTap: onTtsPlay,
-            borderRadius: BorderRadius.circular(10),
-            child: const Padding(
-              padding: EdgeInsets.all(3),
-              child: Icon(
-                Icons.volume_up_rounded,
-                size: 15,
-                color: Color(0xFF0EA5E9),
-              ),
-            ),
-          ),
-        ],
         // 复制按钮
         if (message.text.isNotEmpty) ...[
           const SizedBox(width: 6),
@@ -267,8 +251,8 @@ class MessageBubble extends StatelessWidget {
             ),
           ),
         ],
-        // 重发按钮（仅用户消息）
-        if (isUser && onResend != null) ...[
+        // 重发按钮（仅用户消息，且非音频消息）
+        if (isUser && onResend != null && message.type != MessageType.audio) ...[
           const SizedBox(width: 6),
           InkWell(
             onTap: onResend,
@@ -294,9 +278,10 @@ class MessageBubble extends StatelessWidget {
       SnackBar(
         content: const Text('已复制到剪贴板'),
         duration: const Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
+        behavior: SnackBarBehavior.fixed,
+        margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(16),
+        backgroundColor: const Color(0xFF10B981),
       ),
     );
   }

@@ -10,10 +10,10 @@ class AIService {
   InferenceChat? _chat;
   bool _isInitialized = false;
 
-  // 当前模型参数
-  double _temperature = 1.0;
-  int _topK = 64;
-  double _topP = 0.95;
+  // 当前模型参数（优化默认值以减少复读）
+  double _temperature = 0.8;
+  int _topK = 40;
+  double _topP = 0.9;
   int _maxTokens = 8192;
   String? _currentSystemPrompt;
 
@@ -51,9 +51,9 @@ class AIService {
       final model = _modelManager.currentModel;
       if (model != null) {
         _chat = await model.createChat(
-          temperature: 1.0,
-          topK: 64,
-          topP: 0.95,
+          temperature: 0.8,
+          topK: 40,
+          topP: 0.9,
           randomSeed: 42,
           tokenBuffer: 512,
           supportImage: true,
@@ -109,6 +109,8 @@ class AIService {
         _currentSystemPrompt = systemPrompt;
         _needsReset = false;
 
+        debugPrint('🔄 重建会话：参数变化或需要重置');
+
         final model = await FlutterGemma.getActiveModel(
           maxTokens: _maxTokens,
           supportImage: true,
@@ -127,15 +129,18 @@ class AIService {
           supportAudio: true,
         );
 
+        debugPrint('✅ 新会话已创建');
+
         // 系统提示词作为第一条AI消息注入
         if (systemPrompt != null && systemPrompt.isNotEmpty) {
           await _chat!.addQuery(
             Message(text: systemPrompt, isUser: false),
           );
+          debugPrint('✅ 系统提示词已注入');
         }
       }
 
-      // 添加用户消息
+      // 添加用户消息（必须在会话重建之后）
       final message = imageBytes != null
           ? Message(text: text, imageBytes: imageBytes, isUser: true)
           : Message(text: text, isUser: true);
@@ -153,8 +158,35 @@ class AIService {
     }
   }
 
-  /// 标记需要重置（取消时调用）—— 不立即重建，下次发送时重建
-  /// 这样避免取消后立即重建会话的耗时，同时保证下次发送是全新上下文
+  /// 标记需要重置并立即重建会话（取消时调用）
+  /// 立即重建确保旧的生成器完全停止
+  Future<void> resetSession() async {
+    debugPrint('🔄 立即重置会话');
+    _needsReset = false;
+    _currentSystemPrompt = null;
+
+    final model = await FlutterGemma.getActiveModel(
+      maxTokens: _maxTokens,
+      supportImage: true,
+      maxNumImages: 1,
+      supportAudio: true,
+      preferredBackend: PreferredBackend.gpu,
+    );
+
+    _chat = await model.createChat(
+      temperature: _temperature,
+      topK: _topK,
+      topP: _topP,
+      randomSeed: 42,
+      tokenBuffer: 512,
+      supportImage: true,
+      supportAudio: true,
+    );
+
+    debugPrint('✅ 会话已重置');
+  }
+
+  /// 标记需要重置（翻译页面退出时调用）—— 延迟到下次发送时重建
   void markNeedsReset() {
     _needsReset = true;
     _currentSystemPrompt = null;

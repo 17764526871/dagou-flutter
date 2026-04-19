@@ -10,6 +10,7 @@ import '../../widgets/chat/message_bubble.dart';
 import '../../widgets/chat/input_bar.dart';
 import '../settings/settings_screen.dart';
 import '../translate/translate_screen.dart';
+import '../models/model_list_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -304,8 +305,8 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     });
 
-    // 标记需要重置（不立即重建，下次发送时自动用新会话）
-    AIService.instance.markNeedsReset();
+    // 立即重置会话，确保旧的生成器完全停止
+    await AIService.instance.resetSession();
   }
 
   Future<void> _resendMessage(Message userMsg) async {
@@ -399,18 +400,30 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!_scrollController.hasClients) return;
     if (!force && _userScrolledUp) return;
 
-    // 使用 jumpTo 避免动画造成的卡顿感（流式输出时）
+    // 使用多次 postFrameCallback 确保布局完成后滚动到真正的底部
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
-      final maxExtent = _scrollController.position.maxScrollExtent;
+
       if (force) {
-        _scrollController.animateTo(
-          maxExtent,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-        );
+        // 强制滚动：先 jumpTo 再 animateTo，确保到达真正底部
+        final maxExtent = _scrollController.position.maxScrollExtent;
+        _scrollController.jumpTo(maxExtent);
+
+        // 再次检查并动画滚动（处理布局延迟）
+        Future.delayed(const Duration(milliseconds: 50), () {
+          if (!mounted || !_scrollController.hasClients) return;
+          final newMax = _scrollController.position.maxScrollExtent;
+          if (newMax > maxExtent) {
+            _scrollController.animateTo(
+              newMax,
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
+            );
+          }
+        });
       } else {
         // 流式输出时用 jumpTo 避免动画堆积导致卡顿
+        final maxExtent = _scrollController.position.maxScrollExtent;
         _scrollController.jumpTo(maxExtent);
       }
     });
@@ -421,7 +434,8 @@ class _ChatScreenState extends State<ChatScreen> {
       SnackBar(
         content: Text(message),
         backgroundColor: Colors.red.shade400,
-        behavior: SnackBarBehavior.floating,
+        behavior: SnackBarBehavior.fixed,
+        margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
@@ -441,6 +455,13 @@ class _ChatScreenState extends State<ChatScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const TranslateScreen()),
+    );
+  }
+
+  void _openModelManagement() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ModelListScreen()),
     );
   }
 
@@ -499,10 +520,10 @@ class _ChatScreenState extends State<ChatScreen> {
             ],
           ),
 
-          // 滚动到底部按钮（居中显示）
+          // 滚动到底部按钮（居中显示，位置更高）
           if (_showScrollToBottom)
             Positioned(
-              bottom: 80,
+              bottom: 100,
               left: 0,
               right: 0,
               child: Center(child: _buildScrollToBottomButton()),
@@ -519,33 +540,23 @@ class _ChatScreenState extends State<ChatScreen> {
         _scrollToBottom(force: true);
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        width: 44,
+        height: 44,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 12,
-              offset: const Offset(0, 3),
+              color: Colors.black.withValues(alpha: 0.15),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.keyboard_arrow_down_rounded,
-                color: Color(0xFF0EA5E9), size: 20),
-            SizedBox(width: 4),
-            Text(
-              '回到底部',
-              style: TextStyle(
-                fontSize: 13,
-                color: Color(0xFF0EA5E9),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
+        child: const Icon(
+          Icons.keyboard_arrow_down_rounded,
+          color: Color(0xFF0EA5E9),
+          size: 28,
         ),
       ),
     );
@@ -701,7 +712,7 @@ class _ChatScreenState extends State<ChatScreen> {
               label: '模型管理',
               onTap: () {
                 Navigator.pop(context);
-                _openSettings();
+                _openModelManagement();
               },
             ),
             _buildDrawerItem(
@@ -732,7 +743,7 @@ class _ChatScreenState extends State<ChatScreen> {
             const Padding(
               padding: EdgeInsets.all(16),
               child: Text(
-                'DG AI v1.1.1 · Gemma 4 E2B',
+                'DG AI v1.1.2 · Gemma 4 E2B',
                 style: TextStyle(
                   fontSize: 12,
                   color: Color(0xFF94A3B8),

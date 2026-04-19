@@ -91,9 +91,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         backgroundColor:
             isError ? const Color(0xFFEF4444) : const Color(0xFF10B981),
         duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
+        behavior: SnackBarBehavior.fixed,
+        margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(16),
       ),
     );
   }

@@ -543,10 +543,10 @@ class _ModelListScreenState extends State<ModelListScreen> {
           SnackBar(
             content: Text('已切换到 ${model.name}'),
             backgroundColor: const Color(0xFF10B981),
-            behavior: SnackBarBehavior.floating,
+            behavior: SnackBarBehavior.fixed,
+            margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10)),
-            margin: const EdgeInsets.all(16),
           ),
         );
       }
@@ -557,10 +557,10 @@ class _ModelListScreenState extends State<ModelListScreen> {
           SnackBar(
             content: Text('切换失败：$e'),
             backgroundColor: const Color(0xFFEF4444),
-            behavior: SnackBarBehavior.floating,
+            behavior: SnackBarBehavior.fixed,
+            margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10)),
-            margin: const EdgeInsets.all(16),
           ),
         );
       }
@@ -575,7 +575,7 @@ class _ModelListScreenState extends State<ModelListScreen> {
       _downloadProgress[model.id] = 0.0;
     });
 
-    final stream = _modelManager.downloadModel(model.url!);
+    final stream = _modelManager.downloadModel(model.id, model.url!);
     final sub = stream.listen(
       (progress) {
         if (mounted) {
@@ -593,10 +593,10 @@ class _ModelListScreenState extends State<ModelListScreen> {
             SnackBar(
               content: Text('${model.name} 下载完成'),
               backgroundColor: const Color(0xFF10B981),
-              behavior: SnackBarBehavior.floating,
+              behavior: SnackBarBehavior.fixed,
+              margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
-              margin: const EdgeInsets.all(16),
             ),
           );
         }
@@ -612,10 +612,10 @@ class _ModelListScreenState extends State<ModelListScreen> {
             SnackBar(
               content: Text('下载失败：$e'),
               backgroundColor: const Color(0xFFEF4444),
-              behavior: SnackBarBehavior.floating,
+              behavior: SnackBarBehavior.fixed,
+              margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
-              margin: const EdgeInsets.all(16),
             ),
           );
         }
