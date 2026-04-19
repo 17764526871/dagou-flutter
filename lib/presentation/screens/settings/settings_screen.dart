@@ -15,19 +15,46 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _systemPromptController = TextEditingController();
 
-  // 模型参数
   double _temperature = 1.0;
   int _topK = 64;
   double _topP = 0.95;
   int _maxTokens = 8192;
-
-  // 翻译设置
-  bool _enableTranslation = false;
-  String _translationMode = 'zh-en'; // zh-en, en-zh, auto
-
-  // 显示设置
   bool _showMetrics = true;
   bool _showTimestamp = true;
+
+  // 预设系统提示词
+  static const List<Map<String, String>> _presets = [
+    {
+      'label': '🤖 智能助手',
+      'prompt':
+          '你是 DG AI，一个聪明、友善、有温度的 AI 助手。你说话自然流畅，偶尔会用 emoji 增加亲切感。你会认真理解用户的问题，给出清晰、实用的回答。遇到不确定的事情会坦诚说明，不会胡编乱造。',
+    },
+    {
+      'label': '💻 代码专家',
+      'prompt':
+          '你是一位经验丰富的全栈工程师，精通多种编程语言和框架。你擅长代码审查、调试、架构设计和性能优化。回答时会给出具体的代码示例，并解释关键思路。说话简洁专业，直击要点。',
+    },
+    {
+      'label': '📚 学习导师',
+      'prompt':
+          '你是一位耐心的学习导师，善于把复杂的概念用简单易懂的方式解释清楚。你会用类比、举例和循序渐进的方式帮助用户理解知识。鼓励用户提问，营造轻松的学习氛围。',
+    },
+    {
+      'label': '✍️ 写作助手',
+      'prompt':
+          '你是一位专业的写作助手，擅长各类文体的写作和润色。你能帮助用户改善文章结构、优化措辞、提升表达效果。对于创意写作，你会发挥想象力；对于正式文书，你会保持严谨规范。',
+    },
+    {
+      'label': '🧠 深度思考',
+      'prompt':
+          '你是一个善于深度思考的 AI。面对问题时，你会从多个角度分析，考虑不同观点，权衡利弊，给出有深度的见解。你不会给出简单的答案，而是帮助用户建立更全面的认知。',
+    },
+    {
+      'label': '😄 轻松聊天',
+      'prompt':
+          '你是一个幽默风趣的聊天伙伴！你喜欢用轻松愉快的方式交流，偶尔开个小玩笑，让对话充满乐趣。你关心用户的感受，善于倾听，是个很好的聊天朋友。',
+    },
+  ];
 
   @override
   void initState() {
@@ -37,19 +64,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _loadSettings() async {
     await SettingsService.instance.initialize();
+    if (!mounted) return;
     setState(() {
       _systemPromptController.text = SettingsService.instance.loadSystemPrompt();
-
       final modelParams = SettingsService.instance.loadModelParams();
       _temperature = modelParams['temperature'];
       _topK = modelParams['topK'];
       _topP = modelParams['topP'];
       _maxTokens = modelParams['maxTokens'];
-
-      final translationSettings = SettingsService.instance.loadTranslationSettings();
-      _enableTranslation = translationSettings['enable'];
-      _translationMode = translationSettings['mode'];
-
       final displaySettings = SettingsService.instance.loadDisplaySettings();
       _showMetrics = displaySettings['showMetrics'];
       _showTimestamp = displaySettings['showTimestamp'];
@@ -62,22 +84,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.dispose();
   }
 
-  void _showTopSnackBar(String message, {Color? backgroundColor}) {
+  void _showSnack(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: backgroundColor ?? const Color(0xFF48BB78),
+        backgroundColor:
+            isError ? const Color(0xFFEF4444) : const Color(0xFF10B981),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.only(
-          top: MediaQuery.of(context).padding.top + 16,
-          left: 16,
-          right: 16,
-          bottom: MediaQuery.of(context).size.height - 100,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }
@@ -90,17 +106,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       topP: _topP,
       maxTokens: _maxTokens,
     );
-    await SettingsService.instance.saveTranslationSettings(
-      enable: _enableTranslation,
-      mode: _translationMode,
-    );
     await SettingsService.instance.saveDisplaySettings(
       showMetrics: _showMetrics,
       showTimestamp: _showTimestamp,
     );
-
     if (mounted) {
-      _showTopSnackBar('设置已保存');
+      _showSnack('设置已保存');
       Navigator.pop(context);
     }
   }
@@ -109,6 +120,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: const Text('重置设置'),
         content: const Text('确定要重置所有设置为默认值吗？'),
         actions: [
@@ -118,32 +130,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('确定', style: TextStyle(color: Color(0xFFF56565))),
+            child: const Text('确定',
+                style: TextStyle(color: Color(0xFFEF4444))),
           ),
         ],
       ),
     );
-
     if (confirm == true) {
       await SettingsService.instance.resetToDefaults();
       await _loadSettings();
-      if (mounted) {
-        _showTopSnackBar('设置已重置');
-      }
+      if (mounted) _showSnack('设置已重置');
     }
   }
 
   Future<void> _clearCache() async {
     final cacheSize = await CacheService.instance.getCacheSize();
     final sizeStr = CacheService.formatBytes(cacheSize);
-
     if (!mounted) return;
-
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: const Text('清除缓存'),
-        content: Text('当前缓存大小：$sizeStr\n\n确定要清除所有缓存吗？'),
+        content: Text('当前缓存：$sizeStr\n\n确定要清除吗？'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -151,19 +160,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('确定', style: TextStyle(color: Color(0xFFF56565))),
+            child: const Text('清除',
+                style: TextStyle(color: Color(0xFFEF4444))),
           ),
         ],
       ),
     );
-
     if (confirm == true) {
       final success = await CacheService.instance.clearAllCache();
       if (mounted) {
-        _showTopSnackBar(
-          success ? '缓存已清除' : '清除缓存失败',
-          backgroundColor: success ? const Color(0xFF48BB78) : const Color(0xFFF56565),
-        );
+        _showSnack(success ? '缓存已清除' : '清除失败', isError: !success);
       }
     }
   }
@@ -176,117 +182,142 @@ class _SettingsScreenState extends State<SettingsScreen> {
         elevation: 0,
         backgroundColor: Colors.white,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF2D3748)),
+          icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF64748B)),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           '设置',
           style: TextStyle(
-            color: Color(0xFF2D3748),
-            fontSize: 18,
+            color: Color(0xFF1E293B),
+            fontSize: 17,
             fontWeight: FontWeight.bold,
           ),
         ),
+        actions: [
+          TextButton(
+            onPressed: _saveSettings,
+            child: const Text(
+              '保存',
+              style: TextStyle(
+                color: Color(0xFF0EA5E9),
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         children: [
+          // 模型管理
           _buildSection(
             title: '模型管理',
+            icon: Icons.memory_rounded,
             children: [
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0EA5E9).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.memory,
-                    color: Color(0xFF0EA5E9),
-                  ),
+              _buildNavTile(
+                icon: Icons.layers_rounded,
+                label: '模型列表',
+                subtitle: '查看和切换 AI 模型',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const ModelListScreen()),
                 ),
-                title: const Text(
-                  '模型列表',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                subtitle: const Text(
-                  '查看和切换 AI 模型',
-                  style: TextStyle(fontSize: 13),
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ModelListScreen(),
-                    ),
-                  );
-                },
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
+          // 系统提示词
           _buildSection(
             title: '系统提示词',
+            icon: Icons.psychology_rounded,
             children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(14, 4, 14, 0),
+                child: Text(
+                  '定义 AI 的角色和行为风格',
+                  style: TextStyle(
+                      fontSize: 12, color: Color(0xFF94A3B8)),
+                ),
+              ),
+              // 预设快捷选择
               Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '自定义 AI 的行为和角色',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF718096),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _systemPromptController,
-                      maxLines: 4,
-                      decoration: InputDecoration(
-                        hintText: '输入系统提示词...',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE2E8F0),
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _presets.map((preset) {
+                    final isActive =
+                        _systemPromptController.text == preset['prompt'];
+                    return GestureDetector(
+                      onTap: () => setState(() {
+                        _systemPromptController.text = preset['prompt']!;
+                      }),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isActive
+                              ? const Color(0xFF0EA5E9)
+                              : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(20),
+                          border: isActive
+                              ? null
+                              : Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Text(
+                          preset['label']!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: isActive
+                                ? Colors.white
+                                : const Color(0xFF64748B),
                           ),
                         ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF0EA5E9),
-                            width: 2,
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: const Color(0xFFF7FAFC),
                       ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
+                child: TextField(
+                  controller: _systemPromptController,
+                  maxLines: 4,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    hintText: '输入自定义系统提示词...',
+                    hintStyle: const TextStyle(
+                        color: Color(0xFFCBD5E1), fontSize: 14),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide:
+                          const BorderSide(color: Color(0xFFE2E8F0)),
                     ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        _buildPresetChip('默认助手', '你是一个有帮助的AI助手。'),
-                        _buildPresetChip('翻译专家', '你是一个专业的翻译专家，擅长中英互译。'),
-                        _buildPresetChip('代码助手', '你是一个编程专家，擅长解释代码和提供编程建议。'),
-                      ],
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(
+                          color: Color(0xFF0EA5E9), width: 1.5),
                     ),
-                  ],
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    contentPadding: const EdgeInsets.all(12),
+                  ),
+                  style: const TextStyle(
+                      fontSize: 14, color: Color(0xFF1E293B), height: 1.5),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
+          // 模型参数
           _buildSection(
             title: '模型参数',
+            icon: Icons.tune_rounded,
             children: [
               _buildSlider(
                 label: 'Temperature',
@@ -294,8 +325,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 min: 0.0,
                 max: 2.0,
                 divisions: 20,
-                onChanged: (value) => setState(() => _temperature = value),
-                description: '控制输出的随机性，值越高越随机',
+                onChanged: (v) => setState(() => _temperature = v),
+                description: '值越高输出越随机，越低越保守',
               ),
               _buildSlider(
                 label: 'Top K',
@@ -303,8 +334,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 min: 1,
                 max: 100,
                 divisions: 99,
-                onChanged: (value) => setState(() => _topK = value.toInt()),
-                description: '限制每步采样的词汇数量',
+                onChanged: (v) => setState(() => _topK = v.toInt()),
+                description: '每步采样的候选词数量',
               ),
               _buildSlider(
                 label: 'Top P',
@@ -312,7 +343,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 min: 0.0,
                 max: 1.0,
                 divisions: 20,
-                onChanged: (value) => setState(() => _topP = value),
+                onChanged: (v) => setState(() => _topP = v),
                 description: '核采样概率阈值',
               ),
               _buildSlider(
@@ -321,144 +352,125 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 min: 512,
                 max: 8192,
                 divisions: 15,
-                onChanged: (value) => setState(() => _maxTokens = value.toInt()),
-                description: '最大生成长度',
+                onChanged: (v) => setState(() => _maxTokens = v.toInt()),
+                description: '最大生成 Token 数',
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
+          // 高级设置
           _buildSection(
             title: '高级设置',
+            icon: Icons.settings_rounded,
             children: [
               _buildDropdown(
                 label: '推理后端',
-                value: ModelManager.instance.currentBackend == PreferredBackend.gpu ? 'gpu' : 'cpu',
+                value: ModelManager.instance.currentBackend ==
+                        PreferredBackend.gpu
+                    ? 'gpu'
+                    : 'cpu',
                 items: const [
                   {'value': 'gpu', 'label': 'GPU（推荐）'},
                   {'value': 'cpu', 'label': 'CPU'},
                 ],
                 onChanged: (value) async {
-                  final backend = value == 'gpu' ? PreferredBackend.gpu : PreferredBackend.cpu;
-                  final currentModelId = ModelManager.instance.currentModelId;
-                  if (currentModelId != null) {
-                    await ModelManager.instance.switchModel(currentModelId, backend: backend);
-                    setState(() {});
+                  final backend = value == 'gpu'
+                      ? PreferredBackend.gpu
+                      : PreferredBackend.cpu;
+                  final id = ModelManager.instance.currentModelId;
+                  if (id != null) {
+                    await ModelManager.instance
+                        .switchModel(id, backend: backend);
+                    if (mounted) setState(() {});
                     if (mounted) {
-                      _showTopSnackBar('已切换到 ${value == 'gpu' ? 'GPU' : 'CPU'} 后端');
+                      _showSnack(
+                          '已切换到 ${value == 'gpu' ? 'GPU' : 'CPU'} 后端');
                     }
                   }
                 },
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          _buildSection(
-            title: '翻译功能',
-            children: [
-              _buildSwitch(
-                label: '启用翻译模式',
-                value: _enableTranslation,
-                onChanged: (value) => setState(() => _enableTranslation = value),
-                description: '自动识别并翻译输入内容',
-              ),
-              if (_enableTranslation)
-                _buildDropdown(
-                  label: '翻译方向',
-                  value: _translationMode,
-                  items: const [
-                    {'value': 'zh-en', 'label': '中文 → English'},
-                    {'value': 'en-zh', 'label': 'English → 中文'},
-                    {'value': 'auto', 'label': '自动检测'},
-                  ],
-                  onChanged: (value) => setState(() => _translationMode = value!),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
+          // 显示设置
           _buildSection(
             title: '显示设置',
+            icon: Icons.visibility_rounded,
             children: [
               _buildSwitch(
                 label: '显示性能指标',
                 value: _showMetrics,
-                onChanged: (value) => setState(() => _showMetrics = value),
-                description: '显示推理速度、Token 数等信息',
+                onChanged: (v) => setState(() => _showMetrics = v),
+                description: '推理速度、Token 数等',
               ),
               _buildSwitch(
                 label: '显示时间戳',
                 value: _showTimestamp,
-                onChanged: (value) => setState(() => _showTimestamp = value),
-                description: '在消息下方显示时间',
+                onChanged: (v) => setState(() => _showTimestamp = v),
+                description: '消息发送时间',
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
+          // 关于
           _buildSection(
             title: '关于',
+            icon: Icons.info_outline_rounded,
             children: [
-              _buildInfoItem('版本', '2.0.0'),
-              _buildInfoItem('模型', 'Gemma 4 E2B (2B)'),
-              _buildInfoItem('运行模式', '端侧离线'),
+              _buildInfoRow('版本', 'v1.1.1'),
+              _buildInfoRow('模型', 'Gemma 4 E2B (2B)'),
+              _buildInfoRow('运行模式', '端侧离线'),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
-          // 保存按钮
+          // 操作按钮
           ElevatedButton(
             onPressed: _saveSettings,
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF0EA5E9),
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+                  borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
             ),
-            child: const Text(
-              '保存设置',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
+            child: const Text('保存设置',
+                style:
+                    TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
           ),
-          const SizedBox(height: 12),
-
-          // 重置按钮
+          const SizedBox(height: 10),
           OutlinedButton(
             onPressed: _resetSettings,
             style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF718096),
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              foregroundColor: const Color(0xFF64748B),
+              padding: const EdgeInsets.symmetric(vertical: 14),
               side: const BorderSide(color: Color(0xFFE2E8F0)),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+                  borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text(
-              '重置为默认设置',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
+            child: const Text('重置为默认',
+                style:
+                    TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
           ),
-          const SizedBox(height: 12),
-
-          // 清除缓存按钮
+          const SizedBox(height: 10),
           OutlinedButton(
             onPressed: _clearCache,
             style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFFF56565),
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              side: const BorderSide(color: Color(0xFFF56565)),
+              foregroundColor: const Color(0xFFEF4444),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              side: const BorderSide(color: Color(0xFFEF4444)),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+                  borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text(
-              '清除缓存',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
+            child: const Text('清除缓存',
+                style:
+                    TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
           ),
+          const SizedBox(height: 30),
         ],
       ),
     );
@@ -466,16 +478,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildSection({
     required String title,
+    required IconData icon,
     required List<Widget> children,
   }) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
@@ -484,36 +497,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF2D3748),
-              ),
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+            child: Row(
+              children: [
+                Icon(icon, size: 18, color: const Color(0xFF0EA5E9)),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+              ],
             ),
           ),
-          const Divider(height: 1),
+          const Divider(height: 1, indent: 14, endIndent: 14),
           ...children,
         ],
       ),
     );
   }
 
-  Widget _buildPresetChip(String label, String prompt) {
-    return ActionChip(
-      label: Text(label),
-      onPressed: () {
-        setState(() {
-          _systemPromptController.text = prompt;
-        });
-      },
-      backgroundColor: const Color(0xFFF7FAFC),
-      labelStyle: const TextStyle(
-        fontSize: 12,
-        color: Color(0xFF0EA5E9),
+  Widget _buildNavTile({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: const Color(0xFF0EA5E9).withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(9),
+        ),
+        child: Icon(icon, size: 18, color: const Color(0xFF0EA5E9)),
       ),
+      title: Text(label,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+      subtitle: Text(subtitle,
+          style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+      trailing: const Icon(Icons.chevron_right_rounded,
+          color: Color(0xFFCBD5E1)),
+      onTap: onTap,
     );
   }
 
@@ -527,47 +556,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String description,
   }) {
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF2D3748),
+              Text(label,
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF1E293B))),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0EA5E9).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
                 ),
-              ),
-              Text(
-                value.toStringAsFixed(value < 10 ? 2 : 0),
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF0EA5E9),
+                child: Text(
+                  value.toStringAsFixed(value < 10 ? 2 : 0),
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0EA5E9)),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Slider(
-            value: value,
-            min: min,
-            max: max,
-            divisions: divisions,
-            activeColor: const Color(0xFF0EA5E9),
-            onChanged: onChanged,
-          ),
-          Text(
-            description,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Color(0xFF718096),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 3,
+              thumbShape:
+                  const RoundSliderThumbShape(enabledThumbRadius: 8),
+              overlayShape:
+                  const RoundSliderOverlayShape(overlayRadius: 16),
+            ),
+            child: Slider(
+              value: value,
+              min: min,
+              max: max,
+              divisions: divisions,
+              activeColor: const Color(0xFF0EA5E9),
+              inactiveColor: const Color(0xFFE2E8F0),
+              onChanged: onChanged,
             ),
           ),
+          Text(description,
+              style: const TextStyle(
+                  fontSize: 11, color: Color(0xFF94A3B8))),
+          const SizedBox(height: 6),
         ],
       ),
     );
@@ -580,34 +619,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String description,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         children: [
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF2D3748),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF718096),
-                  ),
-                ),
+                Text(label,
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 2),
+                Text(description,
+                    style: const TextStyle(
+                        fontSize: 12, color: Color(0xFF94A3B8))),
               ],
             ),
           ),
           Switch(
             value: value,
+            activeThumbColor: Colors.white,
             activeTrackColor: const Color(0xFF0EA5E9),
             onChanged: onChanged,
           ),
@@ -623,60 +654,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required ValueChanged<String?> onChanged,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF2D3748),
-            ),
-          ),
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 14, fontWeight: FontWeight.w500)),
           DropdownButton<String>(
             value: value,
-            items: items.map((item) {
-              return DropdownMenuItem<String>(
-                value: item['value'],
-                child: Text(item['label']!),
-              );
-            }).toList(),
+            items: items
+                .map((item) => DropdownMenuItem<String>(
+                      value: item['value'],
+                      child: Text(item['label']!),
+                    ))
+                .toList(),
             onChanged: onChanged,
-            underline: Container(),
+            underline: const SizedBox(),
             style: const TextStyle(
-              fontSize: 15,
-              color: Color(0xFF0EA5E9),
-              fontWeight: FontWeight.w500,
-            ),
+                fontSize: 14,
+                color: Color(0xFF0EA5E9),
+                fontWeight: FontWeight.w500),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildInfoItem(String label, String value) {
+  Widget _buildInfoRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 15,
-              color: Color(0xFF718096),
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF2D3748),
-            ),
-          ),
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 14, color: Color(0xFF64748B))),
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF1E293B))),
         ],
       ),
     );

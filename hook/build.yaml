@@ -1,0 +1,8 @@
+# 配置sqlite3不下载预编译库，使用系统自带的
+targets:
+  $default:
+    builders:
+      sqlite3:
+        options:
+          sqlite3:
+            download: false

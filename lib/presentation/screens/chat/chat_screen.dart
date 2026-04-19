@@ -9,6 +9,7 @@ import '../../../services/storage/settings_service.dart';
 import '../../widgets/chat/message_bubble.dart';
 import '../../widgets/chat/input_bar.dart';
 import '../settings/settings_screen.dart';
+import '../translate/translate_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -31,11 +32,15 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _showImagePreview = false;
   StreamSubscription<String>? _streamSubscription;
 
+  // 滚动到底部按钮
+  bool _showScrollToBottom = false;
+  // 用户是否手动上滑（流式输出时用）
+  bool _userScrolledUp = false;
+
   // 性能指标
   int _totalTokens = 0;
   double _tokensPerSecond = 0.0;
   DateTime? _inferenceStartTime;
-  DateTime? _inferenceEndTime;
   int _totalCharacters = 0;
   double _averageLatency = 0.0;
   bool _showMetrics = true;
@@ -49,10 +54,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _enableTts = true;
   bool _autoPlayTts = false;
   String _ttsLanguage = 'zh-CN';
-  bool _enableTranslation = false;
-  String _translationMode = 'auto';
   bool _showTimestamp = true;
-  bool _userScrolling = false;
 
   @override
   void initState() {
@@ -65,6 +67,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _initSettings() async {
     await SettingsService.instance.initialize();
+    if (!mounted) return;
     setState(() {
       _systemPrompt = SettingsService.instance.loadSystemPrompt();
       final modelParams = SettingsService.instance.loadModelParams();
@@ -78,10 +81,6 @@ class _ChatScreenState extends State<ChatScreen> {
       _autoPlayTts = ttsSettings['autoPlay'];
       _ttsLanguage = ttsSettings['language'];
 
-      final translationSettings = SettingsService.instance.loadTranslationSettings();
-      _enableTranslation = translationSettings['enable'];
-      _translationMode = translationSettings['mode'];
-
       final displaySettings = SettingsService.instance.loadDisplaySettings();
       _showMetrics = displaySettings['showMetrics'];
       _showTimestamp = displaySettings['showTimestamp'];
@@ -89,59 +88,49 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _onScroll() {
-    if (_scrollController.hasClients) {
-      final maxScroll = _scrollController.position.maxScrollExtent;
-      final currentScroll = _scrollController.position.pixels;
-      final isNearBottom = maxScroll - currentScroll < 50;
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final current = _scrollController.position.pixels;
+    final distFromBottom = maxScroll - current;
 
-      // 只在流式输出时才自动跟随
-      if (_isSending) {
-        if (isNearBottom && _userScrolling) {
-          setState(() => _userScrolling = false);
-        } else if (currentScroll < maxScroll - 200 && !_userScrolling) {
-          setState(() => _userScrolling = true);
-        }
-      }
+    // 显示/隐藏滚到底部按钮
+    final shouldShow = distFromBottom > 150;
+    if (shouldShow != _showScrollToBottom) {
+      setState(() => _showScrollToBottom = shouldShow);
+    }
+
+    // 用户手动上滑时停止自动跟随
+    if (_isSending) {
+      _userScrolledUp = distFromBottom > 80;
     }
   }
 
   @override
   void dispose() {
-    // 取消流订阅
     _streamSubscription?.cancel();
     _streamSubscription = null;
-
-    // 释放控制器
     _textController.dispose();
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
-
-    // 停止TTS
     _flutterTts.stop();
-
-    // 清理消息列表（释放图片内存）
     _messages.clear();
-
-    // 清理待发送的图片
     _pendingImage = null;
-
     super.dispose();
   }
 
   void _addWelcomeMessage() {
-    setState(() {
-      _messages.add(Message.text(
-        text: '👋 你好！我是 **DG AI** 助手\n\n'
-            '✨ 完全运行在你手机上的端侧 AI\n'
-            '🔒 无需联网，保护隐私\n\n'
-            '**我可以帮你：**\n'
-            '- 💬 智能对话\n'
-            '- 🖼️ 图片分析\n'
-            '- 🌐 中英互译\n'
-            '- 🎤 语音交互\n\n'
-            '开始对话吧！',
-        isUser: false,
-      ));
-    });
+    _messages.add(Message.text(
+      text: '👋 你好！我是 **DG AI** 助手\n\n'
+          '✨ 完全运行在你手机上的端侧 AI\n'
+          '🔒 无需联网，保护隐私\n\n'
+          '**我可以帮你：**\n'
+          '- 💬 智能对话\n'
+          '- 🖼️ 图片分析\n'
+          '- 🌐 翻译功能\n'
+          '- 🎤 语音交互\n\n'
+          '开始对话吧！',
+      isUser: false,
+    ));
   }
 
   Future<void> _initTts() async {
@@ -150,30 +139,20 @@ class _ChatScreenState extends State<ChatScreen> {
       await _flutterTts.setSpeechRate(0.5);
       await _flutterTts.setVolume(1.0);
       await _flutterTts.setPitch(1.0);
-
-      // 设置完成回调
-      _flutterTts.setCompletionHandler(() {
-        // TTS 播放完成
-      });
-
-      _flutterTts.setErrorHandler((msg) {
-        print('TTS 错误: $msg');
-      });
+      _flutterTts.setCompletionHandler(() {});
+      _flutterTts.setErrorHandler((msg) => debugPrint('TTS 错误: $msg'));
     } catch (e) {
-      print('TTS 初始化失败: $e');
+      debugPrint('TTS 初始化失败: $e');
     }
   }
 
   Future<void> _playTts(String text) async {
     if (!_enableTts || text.isEmpty) return;
-
     try {
-      // 停止当前播放
       await _flutterTts.stop();
-      // 开始新的播放
       await _flutterTts.speak(text);
     } catch (e) {
-      print('TTS 播放失败: $e');
+      debugPrint('TTS 播放失败: $e');
     }
   }
 
@@ -189,12 +168,12 @@ class _ChatScreenState extends State<ChatScreen> {
       _pendingImage = null;
       _showImagePreview = false;
       _inferenceStartTime = DateTime.now();
-      _inferenceEndTime = null;
       _totalTokens = 0;
       _totalCharacters = 0;
       _tokensPerSecond = 0.0;
       _averageLatency = 0.0;
-      _userScrolling = false; // 重置滚动状态
+      _streamingText = '';
+      _userScrolledUp = false;
     });
 
     Message userMsg;
@@ -211,38 +190,19 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       _messages.add(userMsg);
       _streamingMessageIndex = _messages.length;
-      _streamingText = '';
       _messages.add(Message.text(text: '', isUser: false));
     });
 
-    _scrollToBottom();
+    _scrollToBottom(force: true);
 
     try {
-      // 构建最终的系统提示词（包含翻译功能）
-      String? finalSystemPrompt = _systemPrompt;
-      if (_enableTranslation) {
-        switch (_translationMode) {
-          case 'zh-en':
-            finalSystemPrompt = '你是专业翻译，将中文翻译成英文。只返回翻译结果，不要解释。';
-            break;
-          case 'en-zh':
-            finalSystemPrompt = '你是专业翻译，将英文翻译成中文。只返回翻译结果，不要解释。';
-            break;
-          case 'auto':
-            finalSystemPrompt = '你是专业翻译，自动识别语言并翻译（中文→英文，英文→中文）。只返回翻译结果，不要解释。';
-            break;
-        }
-      }
-
-      // 取消之前的订阅
       await _streamSubscription?.cancel();
       _streamSubscription = null;
 
-      // 使用流式输出，传递所有参数
       final stream = AIService.instance.sendMessageStream(
         msgText,
         imageBytes: finalImage,
-        systemPrompt: finalSystemPrompt,
+        systemPrompt: _systemPrompt,
         temperature: _temperature,
         topK: _topK,
         topP: _topP,
@@ -251,61 +211,64 @@ class _ChatScreenState extends State<ChatScreen> {
 
       _streamSubscription = stream.listen(
         (chunk) {
-          if (mounted) {
-            setState(() {
-              _streamingText += chunk;
-              if (_streamingMessageIndex != null) {
-                _messages[_streamingMessageIndex!] =
-                    Message.text(text: _streamingText, isUser: false);
-              }
-
-              // 更新性能指标
-              _totalTokens++;
-              _totalCharacters = _streamingText.length;
-              if (_inferenceStartTime != null) {
-                final elapsed = DateTime.now().difference(_inferenceStartTime!);
-                _tokensPerSecond = _totalTokens / elapsed.inMilliseconds * 1000;
-                _averageLatency = elapsed.inMilliseconds / _totalTokens;
-              }
-            });
-            if (!_userScrolling) {
-              _scrollToBottom();
+          if (!mounted) return;
+          _streamingText += chunk;
+          _totalTokens++;
+          _totalCharacters = _streamingText.length;
+          if (_inferenceStartTime != null) {
+            final elapsed = DateTime.now().difference(_inferenceStartTime!);
+            if (elapsed.inMilliseconds > 0) {
+              _tokensPerSecond =
+                  _totalTokens / elapsed.inMilliseconds * 1000;
+              _averageLatency = elapsed.inMilliseconds / _totalTokens;
             }
+          }
+          // 更新消息内容（不触发完整rebuild，只更新对应消息）
+          setState(() {
+            if (_streamingMessageIndex != null &&
+                _streamingMessageIndex! < _messages.length) {
+              _messages[_streamingMessageIndex!] =
+                  Message.text(text: _streamingText, isUser: false);
+            }
+          });
+          // 流式输出时自动跟随（用户未上滑时）
+          if (!_userScrolledUp) {
+            _scrollToBottom(force: false);
           }
         },
         onDone: () {
-          if (mounted) {
-            setState(() {
-              _isSending = false;
-              _streamingMessageIndex = null;
-              _inferenceEndTime = DateTime.now();
-            });
-
-            // 自动播报
-            if (_enableTts && _autoPlayTts && _streamingText.isNotEmpty) {
-              _playTts(_streamingText);
-            }
-          }
+          if (!mounted) return;
+          setState(() {
+            _isSending = false;
+            _streamingMessageIndex = null;
+            _userScrolledUp = false;
+          });
           _streamSubscription = null;
+          _scrollToBottom(force: true);
+          if (_enableTts && _autoPlayTts && _streamingText.isNotEmpty) {
+            _playTts(_streamingText);
+          }
         },
         onError: (e) {
-          if (mounted) {
-            setState(() {
-              if (_streamingMessageIndex != null) {
-                _messages[_streamingMessageIndex!] =
-                    Message.text(text: '抱歉，发生了错误：$e', isUser: false);
-              }
-              _isSending = false;
-              _streamingMessageIndex = null;
-            });
-          }
+          if (!mounted) return;
+          setState(() {
+            if (_streamingMessageIndex != null &&
+                _streamingMessageIndex! < _messages.length) {
+              _messages[_streamingMessageIndex!] =
+                  Message.text(text: '抱歉，发生了错误：$e', isUser: false);
+            }
+            _isSending = false;
+            _streamingMessageIndex = null;
+          });
           _streamSubscription = null;
         },
         cancelOnError: true,
       );
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        if (_streamingMessageIndex != null) {
+        if (_streamingMessageIndex != null &&
+            _streamingMessageIndex! < _messages.length) {
           _messages[_streamingMessageIndex!] =
               Message.text(text: '抱歉，发生了错误：$e', isUser: false);
         }
@@ -313,6 +276,55 @@ class _ChatScreenState extends State<ChatScreen> {
         _streamingMessageIndex = null;
       });
     }
+  }
+
+  Future<void> _cancelSending() async {
+    // 先取消流订阅
+    await _streamSubscription?.cancel();
+    _streamSubscription = null;
+
+    final partialText = _streamingText;
+    final idx = _streamingMessageIndex;
+
+    setState(() {
+      _isSending = false;
+      _streamingText = '';
+      _streamingMessageIndex = null;
+      _userScrolledUp = false;
+
+      if (idx != null && idx < _messages.length) {
+        if (partialText.isNotEmpty) {
+          _messages[idx] = Message.text(
+            text: '$partialText\n\n[已停止生成]',
+            isUser: false,
+          );
+        } else {
+          _messages.removeAt(idx);
+        }
+      }
+    });
+
+    // 标记需要重置（不立即重建，下次发送时自动用新会话）
+    AIService.instance.markNeedsReset();
+  }
+
+  Future<void> _resendMessage(Message userMsg) async {
+    if (_isSending) return;
+
+    final idx = _messages.indexOf(userMsg);
+    if (idx < 0) return;
+
+    setState(() {
+      _messages.removeRange(idx, _messages.length);
+    });
+
+    // 重发前清除历史，确保全新上下文
+    await AIService.instance.clearHistory();
+
+    await _sendMessage(
+      text: userMsg.text,
+      imageBytes: userMsg.mediaBytes,
+    );
   }
 
   Future<void> _handleVoiceRecorded(String voicePath, int duration) async {
@@ -323,17 +335,12 @@ class _ChatScreenState extends State<ChatScreen> {
         isUser: true,
         duration: duration,
       ));
-    });
-    _scrollToBottom();
-
-    // flutter_gemma 暂不支持音频输入（功能开发中）
-    setState(() {
       _messages.add(Message.text(
         text: '我已收到你的语音消息。你可以点击播放按钮回放录音。\n\n当前 flutter_gemma 包暂不支持音频识别功能（该功能正在开发中）。请使用文字或图片输入与我交流。',
         isUser: false,
       ));
     });
-    _scrollToBottom();
+    _scrollToBottom(force: true);
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -341,36 +348,16 @@ class _ChatScreenState extends State<ChatScreen> {
       final XFile? image = await _picker.pickImage(source: source);
       if (image != null) {
         final bytes = await image.readAsBytes();
+        if (!mounted) return;
         setState(() {
           _pendingImage = bytes;
           _showImagePreview = true;
         });
+        _scrollToBottom(force: true);
       }
     } catch (e) {
       _showError('选择图片失败：$e');
     }
-  }
-
-  Future<void> _cancelSending() async {
-    _streamSubscription?.cancel();
-    _streamSubscription = null;
-
-    setState(() {
-      _isSending = false;
-      if (_streamingMessageIndex != null && _streamingText.isNotEmpty) {
-        // 保留已生成的部分内容
-        _messages[_streamingMessageIndex!] =
-            Message.text(text: '$_streamingText\n\n[已停止生成]', isUser: false);
-      } else if (_streamingMessageIndex != null) {
-        // 如果没有内容，删除消息
-        _messages.removeAt(_streamingMessageIndex!);
-      }
-      _streamingMessageIndex = null;
-      _streamingText = '';
-    });
-
-    // 清除 AI 服务的会话状态，避免继续发送之前的内容
-    await AIService.instance.clearHistory();
   }
 
   void _clearMessages() {
@@ -390,27 +377,41 @@ class _ChatScreenState extends State<ChatScreen> {
               Navigator.pop(context);
               setState(() {
                 _messages.clear();
-                _addWelcomeMessage();
+                _streamingText = '';
+                _streamingMessageIndex = null;
               });
+              _addWelcomeMessage();
+              setState(() {});
               await AIService.instance.clearHistory();
             },
-            child: const Text('清除', style: TextStyle(color: Color(0xFFF56565))),
+            child: const Text('清除',
+                style: TextStyle(color: Color(0xFFF56565))),
           ),
         ],
       ),
     );
   }
 
-  void _scrollToBottom() {
-    if (_userScrolling) return; // 用户手动滚动时不自动滚动
+  /// 滚动到底部
+  /// force=true：强制滚动（发送/完成时）
+  /// force=false：仅在用户未上滑时跟随
+  void _scrollToBottom({required bool force}) {
+    if (!_scrollController.hasClients) return;
+    if (!force && _userScrolledUp) return;
 
+    // 使用 jumpTo 避免动画造成的卡顿感（流式输出时）
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients && !_userScrolling) {
+      if (!mounted || !_scrollController.hasClients) return;
+      final maxExtent = _scrollController.position.maxScrollExtent;
+      if (force) {
         _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
+          maxExtent,
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
         );
+      } else {
+        // 流式输出时用 jumpTo 避免动画堆积导致卡顿
+        _scrollController.jumpTo(maxExtent);
       }
     });
   }
@@ -427,19 +428,20 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _openSettings() async {
-    await Navigator.push<Map<String, dynamic>>(
+    await Navigator.push<void>(
       context,
       MaterialPageRoute(builder: (_) => const SettingsScreen()),
     );
-
-    // 设置界面返回后重新加载所有设置
     await _initSettings();
-
-    // 重新初始化 TTS（语言可能已更改）
     await _initTts();
-
-    // 关键修复：清除AI服务的聊天历史，确保新的系统提示词生效
     await AIService.instance.clearHistory();
+  }
+
+  void _openTranslate() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TranslateScreen()),
+    );
   }
 
   @override
@@ -447,45 +449,104 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: _buildAppBar(),
-      body: Column(
+      drawer: _buildDrawer(),
+      body: Stack(
         children: [
-          // 性能指标栏（移到顶部）
-          if (_showMetrics && _isSending) _buildMetricsBar(),
-
-          // 消息列表
-          Expanded(
-            child: _messages.isEmpty
-                ? _buildEmptyState()
-                : Scrollbar(
-                    controller: _scrollController,
-                    thickness: 0, // 隐藏滚动条
-                    child: ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      itemCount: _messages.length,
-                      itemBuilder: (context, index) {
-                        final message = _messages[index];
-                        return MessageBubble(message: message);
-                      },
-                    ),
-                  ),
+          Column(
+            children: [
+              if (_showMetrics && _isSending) _buildMetricsBar(),
+              Expanded(
+                child: _messages.isEmpty
+                    ? _buildEmptyState()
+                    : ListView.builder(
+                        controller: _scrollController,
+                        // 关键：physics 使用 ClampingScrollPhysics 避免弹性滚动干扰
+                        physics: const ClampingScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        itemCount: _messages.length,
+                        itemBuilder: (context, index) {
+                          final message = _messages[index];
+                          final isStreaming = _isSending &&
+                              index == _streamingMessageIndex;
+                          return MessageBubble(
+                            key: ValueKey(message.id),
+                            message: message,
+                            isThinking: isStreaming,
+                            showTimestamp: _showTimestamp,
+                            onTtsPlay:
+                                (!message.isUser && message.text.isNotEmpty)
+                                    ? () => _playTts(message.text)
+                                    : null,
+                            onResend: message.isUser
+                                ? () => _resendMessage(message)
+                                : null,
+                          );
+                        },
+                      ),
+              ),
+              if (_showImagePreview && _pendingImage != null)
+                _buildImagePreview(),
+              InputBar(
+                controller: _textController,
+                onSend: () => _sendMessage(),
+                onCancel: _cancelSending,
+                onVoiceRecorded: _handleVoiceRecorded,
+                onCameraPick: () => _pickImage(ImageSource.camera),
+                onImagePick: () => _pickImage(ImageSource.gallery),
+                isSending: _isSending,
+              ),
+            ],
           ),
 
-          // 图片预览
-          if (_showImagePreview && _pendingImage != null)
-            _buildImagePreview(),
-
-          // 输入栏
-          InputBar(
-            controller: _textController,
-            onSend: () => _sendMessage(),
-            onCancel: _cancelSending,
-            onVoiceRecorded: _handleVoiceRecorded,
-            onCameraPick: () => _pickImage(ImageSource.camera),
-            onImagePick: () => _pickImage(ImageSource.gallery),
-            isSending: _isSending,
-          ),
+          // 滚动到底部按钮（居中显示）
+          if (_showScrollToBottom)
+            Positioned(
+              bottom: 80,
+              left: 0,
+              right: 0,
+              child: Center(child: _buildScrollToBottomButton()),
+            ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildScrollToBottomButton() {
+    return GestureDetector(
+      onTap: () {
+        _userScrolledUp = false;
+        _scrollToBottom(force: true);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 12,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.keyboard_arrow_down_rounded,
+                color: Color(0xFF0EA5E9), size: 20),
+            SizedBox(width: 4),
+            Text(
+              '回到底部',
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF0EA5E9),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -494,46 +555,51 @@ class _ChatScreenState extends State<ChatScreen> {
     return AppBar(
       elevation: 0,
       backgroundColor: Colors.white,
+      leading: Builder(
+        builder: (ctx) => IconButton(
+          icon: const Icon(Icons.menu_rounded, color: Color(0xFF64748B)),
+          onPressed: () => Scaffold.of(ctx).openDrawer(),
+        ),
+      ),
       title: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
               ),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: const Center(
               child: Text(
                 'DG',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 16,
+                  fontSize: 14,
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'DG AI',
                 style: TextStyle(
-                  color: Color(0xFF2D3748),
-                  fontSize: 18,
+                  color: Color(0xFF1E293B),
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               Text(
                 '智能助手',
                 style: TextStyle(
-                  color: Color(0xFF718096),
-                  fontSize: 12,
-                  fontWeight: FontWeight.normal,
+                  color: Color(0xFF94A3B8),
+                  fontSize: 11,
                 ),
               ),
             ],
@@ -543,94 +609,228 @@ class _ChatScreenState extends State<ChatScreen> {
       actions: [
         if (_messages.length > 1)
           IconButton(
-            icon: const Icon(Icons.delete_outline, color: Color(0xFF718096)),
+            icon: const Icon(Icons.delete_outline_rounded,
+                color: Color(0xFF94A3B8)),
             onPressed: _clearMessages,
-            tooltip: '清除对话',
           ),
         IconButton(
-          icon: const Icon(Icons.settings_outlined, color: Color(0xFF718096)),
+          icon: const Icon(Icons.settings_outlined, color: Color(0xFF94A3B8)),
           onPressed: _openSettings,
         ),
       ],
     );
   }
 
+  Widget _buildDrawer() {
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 头部
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'DG',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'DG AI',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Text(
+                    '端侧智能助手',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            // 导航项
+            _buildDrawerItem(
+              icon: Icons.chat_bubble_outline_rounded,
+              label: '智能对话',
+              isActive: true,
+              onTap: () => Navigator.pop(context),
+            ),
+            _buildDrawerItem(
+              icon: Icons.translate_rounded,
+              label: '翻译',
+              onTap: () {
+                Navigator.pop(context);
+                _openTranslate();
+              },
+            ),
+            _buildDrawerItem(
+              icon: Icons.memory_rounded,
+              label: '模型管理',
+              onTap: () {
+                Navigator.pop(context);
+                _openSettings();
+              },
+            ),
+            _buildDrawerItem(
+              icon: Icons.settings_outlined,
+              label: '设置',
+              onTap: () {
+                Navigator.pop(context);
+                _openSettings();
+              },
+            ),
+
+            const Divider(indent: 16, endIndent: 16),
+
+            // 清除对话
+            _buildDrawerItem(
+              icon: Icons.delete_outline_rounded,
+              label: '清除对话',
+              iconColor: const Color(0xFFEF4444),
+              onTap: () {
+                Navigator.pop(context);
+                _clearMessages();
+              },
+            ),
+
+            const Spacer(),
+
+            // 版本信息
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'DG AI v1.1.1 · Gemma 4 E2B',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF94A3B8),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool isActive = false,
+    Color? iconColor,
+  }) {
+    return ListTile(
+      leading: Icon(
+        icon,
+        color: isActive
+            ? const Color(0xFF0EA5E9)
+            : (iconColor ?? const Color(0xFF64748B)),
+        size: 22,
+      ),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+          color: isActive
+              ? const Color(0xFF0EA5E9)
+              : (iconColor ?? const Color(0xFF1E293B)),
+        ),
+      ),
+      tileColor: isActive
+          ? const Color(0xFF0EA5E9).withValues(alpha: 0.08)
+          : null,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      onTap: onTap,
+    );
+  }
+
   Widget _buildMetricsBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF0EA5E9).withValues(alpha: 0.1),
+        color: const Color(0xFF0EA5E9).withValues(alpha: 0.07),
         border: Border(
           bottom: BorderSide(
-            color: const Color(0xFF0EA5E9).withValues(alpha: 0.2),
-            width: 1,
+            color: const Color(0xFF0EA5E9).withValues(alpha: 0.12),
           ),
         ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
+          _buildMetricItem(Icons.speed_rounded, '速度',
+              '${_tokensPerSecond.toStringAsFixed(1)} t/s'),
           _buildMetricItem(
-            icon: Icons.speed,
-            label: '速度',
-            value: '${_tokensPerSecond.toStringAsFixed(1)} t/s',
-          ),
+              Icons.token_rounded, 'Tokens', _totalTokens.toString()),
           _buildMetricItem(
-            icon: Icons.token,
-            label: 'Tokens',
-            value: _totalTokens.toString(),
-          ),
+              Icons.text_fields_rounded, '字符', _totalCharacters.toString()),
           _buildMetricItem(
-            icon: Icons.text_fields,
-            label: '字符',
-            value: _totalCharacters.toString(),
-          ),
-          _buildMetricItem(
-            icon: Icons.timer,
-            label: '时长',
-            value: _inferenceStartTime != null
-                ? '${DateTime.now().difference(_inferenceStartTime!).inSeconds}s'
-                : '0s',
-          ),
-          _buildMetricItem(
-            icon: Icons.access_time,
-            label: '延迟',
-            value: '${_averageLatency.toStringAsFixed(0)}ms',
-          ),
+              Icons.timer_outlined,
+              '时长',
+              _inferenceStartTime != null
+                  ? '${DateTime.now().difference(_inferenceStartTime!).inSeconds}s'
+                  : '0s'),
+          _buildMetricItem(Icons.access_time_rounded, '延迟',
+              '${_averageLatency.toStringAsFixed(0)}ms'),
         ],
       ),
     );
   }
 
-  Widget _buildMetricItem({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
+  Widget _buildMetricItem(IconData icon, String label, String value) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16, color: const Color(0xFF0EA5E9)),
-        const SizedBox(width: 4),
+        Icon(icon, size: 13, color: const Color(0xFF0EA5E9)),
+        const SizedBox(width: 3),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 10,
-                color: Color(0xFF718096),
-              ),
-            ),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF0EA5E9),
-              ),
-            ),
+            Text(label,
+                style: const TextStyle(
+                    fontSize: 9, color: Color(0xFF94A3B8))),
+            Text(value,
+                style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0EA5E9))),
           ],
         ),
       ],
@@ -639,40 +839,38 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildImagePreview() {
     return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(
-          top: BorderSide(
-            color: const Color(0xFFE2E8F0),
-            width: 1,
-          ),
-        ),
+        border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
       ),
       child: Row(
         children: [
           Stack(
+            clipBehavior: Clip.none,
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.memory(
-                  _pendingImage!,
-                  width: 60,
-                  height: 60,
-                  fit: BoxFit.cover,
-                ),
+                borderRadius: BorderRadius.circular(10),
+                child: Image.memory(_pendingImage!,
+                    width: 56, height: 56, fit: BoxFit.cover),
               ),
               Positioned(
-                top: -8,
-                right: -8,
-                child: IconButton(
-                  icon: const Icon(Icons.cancel, color: Colors.red, size: 20),
-                  onPressed: () {
-                    setState(() {
-                      _pendingImage = null;
-                      _showImagePreview = false;
-                    });
-                  },
+                top: -6,
+                right: -6,
+                child: GestureDetector(
+                  onTap: () => setState(() {
+                    _pendingImage = null;
+                    _showImagePreview = false;
+                  }),
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEF4444),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.close, size: 13, color: Colors.white),
+                  ),
                 ),
               ),
             ],
@@ -683,34 +881,51 @@ class _ChatScreenState extends State<ChatScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  '图片已选择',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF718096),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                GestureDetector(
-                  onTap: _isSending ? null : () => _sendMessage(),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
+                const Text('图片已选择',
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w500)),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: _isSending ? null : () => _sendMessage(),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text('直接发送',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600)),
                       ),
-                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Text(
-                      '直接发送',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
+                    const SizedBox(width: 10),
+                    GestureDetector(
+                      onTap: () => setState(() {
+                        _pendingImage = null;
+                        _showImagePreview = false;
+                      }),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text('取消',
+                            style: TextStyle(
+                                fontSize: 12, color: Color(0xFF64748B))),
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -726,42 +941,31 @@ class _ChatScreenState extends State<ChatScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 100,
-            height: 100,
+            width: 80,
+            height: 80,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
               ),
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(22),
             ),
             child: const Center(
-              child: Text(
-                'DG',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 36,
+              child: Text('DG',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text('开始对话',
+              style: TextStyle(
+                  fontSize: 20,
                   fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            '开始对话',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF2D3748),
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            '发送消息或选择功能开始',
-            style: TextStyle(
-              fontSize: 14,
-              color: Color(0xFF718096),
-            ),
-          ),
+                  color: Color(0xFF1E293B))),
+          const SizedBox(height: 6),
+          const Text('发送消息开始',
+              style: TextStyle(fontSize: 14, color: Color(0xFF94A3B8))),
         ],
       ),
     );

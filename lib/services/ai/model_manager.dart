@@ -25,20 +25,31 @@ class ModelManager {
       localPath: 'assets/models/gemma-4-E2B-it.litertlm',
     ),
     AIModelInfo(
-      id: 'gemma-3-nano-2b',
-      name: 'Gemma 3 Nano 2B',
-      size: '1.2GB',
-      capabilities: ['text', 'image'],
-      url: 'https://example.com/gemma-3-nano-2b.bin',
-      description: '轻量级视觉模型',
+      id: 'gemma-3n-e2b',
+      name: 'Gemma 3n E2B',
+      size: '2.0GB',
+      capabilities: ['text', 'image', 'audio'],
+      url:
+          'https://huggingface.co/litert-community/Gemma-3n-E2B-it-litert-lm/resolve/main/gemma-3n-E2B-it.litertlm',
+      description: '多模态轻量模型（文本+图片+音频）',
     ),
     AIModelInfo(
-      id: 'gemma-2-2b',
-      name: 'Gemma 2 2B',
-      size: '1.5GB',
+      id: 'gemma-3-1b',
+      name: 'Gemma 3 1B',
+      size: '0.8GB',
       capabilities: ['text'],
-      url: 'https://example.com/gemma-2-2b.bin',
-      description: '纯文本模型',
+      url:
+          'https://huggingface.co/litert-community/Gemma-3-1B-IT-int4/resolve/main/gemma3-1b-it-int4.task',
+      description: '超轻量纯文本模型，速度最快',
+    ),
+    AIModelInfo(
+      id: 'gemma-3-4b',
+      name: 'Gemma 3 4B',
+      size: '2.6GB',
+      capabilities: ['text', 'image'],
+      url:
+          'https://huggingface.co/litert-community/Gemma-3-4B-IT-int4/resolve/main/gemma3-4b-it-int4.task',
+      description: '中等规模视觉语言模型',
     ),
   ];
 

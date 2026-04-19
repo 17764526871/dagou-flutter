@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_gemma/flutter_gemma.dart';
 import 'model_manager.dart';
 
@@ -15,7 +15,10 @@ class AIService {
   int _topK = 64;
   double _topP = 0.95;
   int _maxTokens = 8192;
-  String? _currentSystemPrompt; // 记录当前系统提示词
+  String? _currentSystemPrompt;
+
+  // 标记：是否需要在下次发送前强制重建会话
+  bool _needsReset = false;
 
   bool get isInitialized => _isInitialized;
 
@@ -24,31 +27,27 @@ class AIService {
     if (_isInitialized) return;
 
     try {
-      print('🔄 开始初始化 Gemma 4 E2B 端侧多模态模型...');
+      debugPrint('🔄 开始初始化 Gemma 4 E2B 端侧多模态模型...');
 
-      // 步骤 1: 安装模型（从内置 assets 加载）
       final installer = FlutterGemma.installModel(
         modelType: ModelType.gemmaIt,
         fileType: ModelFileType.task,
       );
 
-      // 使用内置的 Gemma 4 E2B 模型
       await installer
           .fromAsset('assets/models/gemma-4-E2B-it.litertlm')
           .install();
 
-      print('✅ 模型安装完成');
+      debugPrint('✅ 模型安装完成');
 
-      // 步骤 2: 通过 ModelManager 初始化模型
       await _modelManager.switchModel(
         'gemma-4-e2b',
         backend: PreferredBackend.gpu,
         maxTokens: 8192,
       );
 
-      print('✅ 模型实例创建完成');
+      debugPrint('✅ 模型实例创建完成');
 
-      // 步骤 3: 创建聊天会话
       final model = _modelManager.currentModel;
       if (model != null) {
         _chat = await model.createChat(
@@ -63,48 +62,12 @@ class AIService {
       }
 
       _isInitialized = true;
-      print('✅ Gemma 4 E2B 端侧多模态模型初始化成功！');
+      _needsReset = false;
+      debugPrint('✅ Gemma 4 E2B 端侧多模态模型初始化成功！');
     } catch (e) {
-      print('❌ 模型初始化失败: $e');
+      debugPrint('❌ 模型初始化失败: $e');
       _isInitialized = false;
       rethrow;
-    }
-  }
-
-  /// 发送消息（支持文本和图片）
-  Future<String> sendMessage(String text, {Uint8List? imageBytes}) async {
-    if (!_isInitialized || _chat == null) {
-      return '错误: 模型未初始化，请稍候...';
-    }
-
-    try {
-      // 创建用户消息
-      final message = imageBytes != null
-          ? Message(
-              text: text,
-              imageBytes: imageBytes,
-              isUser: true,
-            )
-          : Message(
-              text: text,
-              isUser: true,
-            );
-
-      // 添加用户消息到历史
-      await _chat!.addQuery(message);
-
-      // 获取 AI 响应
-      final response = await _chat!.generateChatResponse();
-
-      // 处理响应
-      if (response is TextResponse) {
-        return response.token;
-      } else {
-        return '无响应';
-      }
-    } catch (e) {
-      print('❌ 生成响应失败: $e');
-      return '抱歉，生成响应时出错：$e';
     }
   }
 
@@ -124,15 +87,19 @@ class AIService {
     }
 
     try {
-      // 检查参数是否真正改变
       final tempChanged = temperature != null && temperature != _temperature;
       final topKChanged = topK != null && topK != _topK;
       final topPChanged = topP != null && topP != _topP;
       final maxTokensChanged = maxTokens != null && maxTokens != _maxTokens;
       final systemPromptChanged = systemPrompt != _currentSystemPrompt;
 
-      final needRecreate = tempChanged || topKChanged || topPChanged ||
-                          maxTokensChanged || systemPromptChanged;
+      // 需要重建会话的条件：参数变化 OR 被标记为需要重置
+      final needRecreate = tempChanged ||
+          topKChanged ||
+          topPChanged ||
+          maxTokensChanged ||
+          systemPromptChanged ||
+          _needsReset;
 
       if (needRecreate) {
         _temperature = temperature ?? _temperature;
@@ -140,8 +107,8 @@ class AIService {
         _topP = topP ?? _topP;
         _maxTokens = maxTokens ?? _maxTokens;
         _currentSystemPrompt = systemPrompt;
+        _needsReset = false;
 
-        // 重新创建聊天会话
         final model = await FlutterGemma.getActiveModel(
           maxTokens: _maxTokens,
           supportImage: true,
@@ -160,29 +127,19 @@ class AIService {
           supportAudio: true,
         );
 
-        // 如果提供了系统提示词，作为第一条消息添加
+        // 系统提示词作为第一条AI消息注入
         if (systemPrompt != null && systemPrompt.isNotEmpty) {
-          final systemMessage = Message(
-            text: systemPrompt,
-            isUser: false,
+          await _chat!.addQuery(
+            Message(text: systemPrompt, isUser: false),
           );
-          await _chat!.addQuery(systemMessage);
         }
       }
 
-      // 创建用户消息
-      final message = imageBytes != null
-          ? Message(
-              text: text,
-              imageBytes: imageBytes,
-              isUser: true,
-            )
-          : Message(
-              text: text,
-              isUser: true,
-            );
-
       // 添加用户消息
+      final message = imageBytes != null
+          ? Message(text: text, imageBytes: imageBytes, isUser: true)
+          : Message(text: text, isUser: true);
+
       await _chat!.addQuery(message);
 
       // 流式获取响应
@@ -196,45 +153,20 @@ class AIService {
     }
   }
 
-  /// 获取当前模型信息
-  String getCurrentModel() {
-    final modelInfo = _modelManager.currentModelInfo;
-    return modelInfo?.name ?? 'Gemma 4 E2B (2B 参数，多模态：文本+图片+音频)';
-  }
-
-  /// 获取当前模型能力
-  List<String> getCurrentModelCapabilities() {
-    final modelInfo = _modelManager.currentModelInfo;
-    return modelInfo?.capabilities ?? ['text', 'image', 'audio'];
-  }
-
-  /// 切换模型
-  Future<void> switchModel(String modelId, {PreferredBackend? backend}) async {
-    await _modelManager.switchModel(modelId, backend: backend);
-
-    // 重新创建聊天会话
-    final model = _modelManager.currentModel;
-    if (model != null) {
-      _chat = await model.createChat(
-        temperature: _temperature,
-        topK: _topK,
-        topP: _topP,
-        randomSeed: 42,
-        tokenBuffer: 512,
-        supportImage: _modelManager.currentModelInfo?.supportsImage ?? false,
-        supportAudio: _modelManager.currentModelInfo?.supportsAudio ?? false,
-      );
-    }
-  }
-
-  /// 清除聊天历史（重新创建会话）
-  Future<void> clearHistory() async {
-    print('💬 清除聊天历史，重新创建会话');
-
-    // 重置当前系统提示词
+  /// 标记需要重置（取消时调用）—— 不立即重建，下次发送时重建
+  /// 这样避免取消后立即重建会话的耗时，同时保证下次发送是全新上下文
+  void markNeedsReset() {
+    _needsReset = true;
     _currentSystemPrompt = null;
+    debugPrint('🔄 已标记会话需要重置，下次发送时生效');
+  }
 
-    // 重新创建聊天会话
+  /// 清除聊天历史（立即重建会话）
+  Future<void> clearHistory() async {
+    debugPrint('💬 清除聊天历史，重新创建会话');
+    _currentSystemPrompt = null;
+    _needsReset = false;
+
     final model = await FlutterGemma.getActiveModel(
       maxTokens: _maxTokens,
       supportImage: true,
@@ -252,5 +184,38 @@ class AIService {
       supportImage: true,
       supportAudio: true,
     );
+  }
+
+  /// 获取当前模型信息
+  String getCurrentModel() {
+    final modelInfo = _modelManager.currentModelInfo;
+    return modelInfo?.name ?? 'Gemma 4 E2B (2B 参数，多模态：文本+图片+音频)';
+  }
+
+  /// 获取当前模型能力
+  List<String> getCurrentModelCapabilities() {
+    final modelInfo = _modelManager.currentModelInfo;
+    return modelInfo?.capabilities ?? ['text', 'image', 'audio'];
+  }
+
+  /// 切换模型
+  Future<void> switchModel(String modelId, {PreferredBackend? backend}) async {
+    await _modelManager.switchModel(modelId, backend: backend);
+    _needsReset = true;
+    _currentSystemPrompt = null;
+
+    final model = _modelManager.currentModel;
+    if (model != null) {
+      _chat = await model.createChat(
+        temperature: _temperature,
+        topK: _topK,
+        topP: _topP,
+        randomSeed: 42,
+        tokenBuffer: 512,
+        supportImage: _modelManager.currentModelInfo?.supportsImage ?? false,
+        supportAudio: _modelManager.currentModelInfo?.supportsAudio ?? false,
+      );
+      _needsReset = false;
+    }
   }
 }

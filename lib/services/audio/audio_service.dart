@@ -37,6 +37,7 @@ class AudioService {
       }
       return false;
     } catch (e) {
+      // ignore: avoid_print
       print('开始录音失败: $e');
       return false;
     }
@@ -49,6 +50,7 @@ class AudioService {
       _isRecording = false;
       return path;
     } catch (e) {
+      // ignore: avoid_print
       print('停止录音失败: $e');
       _isRecording = false;
       return null;
@@ -70,6 +72,7 @@ class AudioService {
         _currentRecordingPath = null;
       }
     } catch (e) {
+      // ignore: avoid_print
       print('取消录音失败: $e');
     }
   }
@@ -104,6 +107,7 @@ class AudioService {
       final seconds = (bytes / 16000).round();
       return seconds;
     } catch (e) {
+      // ignore: avoid_print
       print('获取音频时长失败: $e');
       return 0;
     }

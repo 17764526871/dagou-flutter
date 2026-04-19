@@ -106,8 +106,8 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> {
             child: Container(
               width: 32,
               height: 32,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
                   colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
                 ),
                 shape: BoxShape.circle,
