@@ -29,15 +29,6 @@ class AIService {
     try {
       debugPrint('🔄 开始初始化 Gemma 4 E2B 端侧多模态模型...');
 
-      final installer = FlutterGemma.installModel(
-        modelType: ModelType.gemmaIt,
-        fileType: ModelFileType.task,
-      );
-
-      await installer
-          .fromAsset('assets/models/gemma-4-E2B-it.litertlm')
-          .install();
-
       debugPrint('✅ 模型安装完成');
 
       await _modelManager.switchModel(
@@ -49,6 +40,7 @@ class AIService {
       debugPrint('✅ 模型实例创建完成');
 
       final model = _modelManager.currentModel;
+      final currentInfo = _modelManager.currentModelInfo;
       if (model != null) {
         _chat = await model.createChat(
           temperature: 0.8,
@@ -56,8 +48,8 @@ class AIService {
           topP: 0.9,
           randomSeed: 42,
           tokenBuffer: 512,
-          supportImage: true,
-          supportAudio: true,
+          supportImage: currentInfo?.supportsImage ?? false,
+          supportAudio: currentInfo?.supportsAudio ?? false,
         );
       }
 
@@ -111,23 +103,24 @@ class AIService {
 
         debugPrint('🔄 重建会话：参数变化或需要重置');
 
+        final currentInfo = _modelManager.currentModelInfo;
         final model = await FlutterGemma.getActiveModel(
           maxTokens: _maxTokens,
-          supportImage: true,
+          supportImage: currentInfo?.supportsImage ?? false,
           maxNumImages: 1,
-          supportAudio: true,
+          supportAudio: currentInfo?.supportsAudio ?? false,
           preferredBackend: PreferredBackend.gpu,
         );
 
         _chat = await model.createChat(
-          temperature: _temperature,
-          topK: _topK,
-          topP: _topP,
-          randomSeed: 42,
-          tokenBuffer: 512,
-          supportImage: true,
-          supportAudio: true,
-        );
+        temperature: _temperature,
+        topK: _topK,
+        topP: _topP,
+        randomSeed: 42,
+        tokenBuffer: 512,
+        supportImage: currentInfo?.supportsImage ?? false,
+        supportAudio: currentInfo?.supportsAudio ?? false,
+      );
 
         debugPrint('✅ 新会话已创建');
 
@@ -177,11 +170,12 @@ class AIService {
     _needsReset = false;
     _currentSystemPrompt = null;
 
+    final currentInfo = _modelManager.currentModelInfo;
     final model = await FlutterGemma.getActiveModel(
       maxTokens: _maxTokens,
-      supportImage: true,
+      supportImage: currentInfo?.supportsImage ?? false,
       maxNumImages: 1,
-      supportAudio: true,
+      supportAudio: currentInfo?.supportsAudio ?? false,
       preferredBackend: PreferredBackend.gpu,
     );
 
@@ -191,8 +185,8 @@ class AIService {
       topP: _topP,
       randomSeed: 42,
       tokenBuffer: 512,
-      supportImage: true,
-      supportAudio: true,
+      supportImage: currentInfo?.supportsImage ?? false,
+      supportAudio: currentInfo?.supportsAudio ?? false,
     );
 
     debugPrint('✅ 会话已重置');
@@ -211,11 +205,12 @@ class AIService {
     _currentSystemPrompt = null;
     _needsReset = false;
 
+    final currentInfo = _modelManager.currentModelInfo;
     final model = await FlutterGemma.getActiveModel(
       maxTokens: _maxTokens,
-      supportImage: true,
+      supportImage: currentInfo?.supportsImage ?? false,
       maxNumImages: 1,
-      supportAudio: true,
+      supportAudio: currentInfo?.supportsAudio ?? false,
       preferredBackend: PreferredBackend.gpu,
     );
 
@@ -225,8 +220,8 @@ class AIService {
       topP: _topP,
       randomSeed: 42,
       tokenBuffer: 512,
-      supportImage: true,
-      supportAudio: true,
+      supportImage: currentInfo?.supportsImage ?? false,
+      supportAudio: currentInfo?.supportsAudio ?? false,
     );
   }
 

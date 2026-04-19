@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python check_repos.py)",
+      "Bash(grep -E \"\\\\.\\(task|litertlm\\)$\")",
+      "Bash(git add *)"
+    ],
+    "additionalDirectories": [
+      "U:\\DG model",
+      "F:\\work\\github\\dagou-flutter"
+    ]
+  }
+}

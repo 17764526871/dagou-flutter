@@ -1,3 +1,5 @@
+import 'package:flutter_gemma/flutter_gemma.dart';
+
 class AIModelInfo {
   final String id;
   final String name;
@@ -7,6 +9,8 @@ class AIModelInfo {
   final String description;
   final bool isBuiltIn;
   final String? localPath;
+  final ModelType modelType;
+  final ModelFileType fileType;
 
   const AIModelInfo({
     required this.id,
@@ -17,6 +21,8 @@ class AIModelInfo {
     required this.description,
     this.isBuiltIn = false,
     this.localPath,
+    this.modelType = ModelType.gemmaIt,
+    this.fileType = ModelFileType.task,
   });
 
   bool get supportsText => capabilities.contains('text');

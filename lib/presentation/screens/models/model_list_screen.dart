@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_gemma/flutter_gemma.dart';
+import 'package:file_picker/file_picker.dart';
 import 'dart:async';
 import '../../../services/ai/model_manager.dart';
 import '../../../data/models/ai_model_info.dart';
@@ -63,6 +64,11 @@ class _ModelListScreenState extends State<ModelListScreen> {
           ),
           const SizedBox(height: 10),
           ...ModelManager.availableModels.map((m) => _buildModelCard(m)),
+          
+          // 从本地文件选择模型
+          const SizedBox(height: 10),
+          _buildLocalFileCard(),
+
           const SizedBox(height: 20),
           // 说明
           Container(
@@ -93,6 +99,128 @@ class _ModelListScreenState extends State<ModelListScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildLocalFileCard() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.folder_open_rounded, color: Color(0xFF64748B), size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    '从本地文件夹选择模型',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                  SizedBox(height: 3),
+                  Text(
+                    '支持 .task, .litertlm, .bin 格式文件',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                  ),
+                ],
+              ),
+            ),
+            ElevatedButton(
+              onPressed: _pickLocalModel,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0EA5E9),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+              ),
+              child: const Text('选择', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickLocalModel() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['task', 'litertlm', 'bin'],
+      );
+
+      if (result != null && result.files.single.path != null) {
+        String path = result.files.single.path!;
+        String fileName = result.files.single.name;
+        
+        // 猜测模型类型
+        ModelType guessModelType = ModelType.general;
+        ModelFileType guessFileType = ModelFileType.task;
+        
+        if (fileName.toLowerCase().contains('gemma')) guessModelType = ModelType.gemmaIt;
+        if (fileName.toLowerCase().contains('qwen')) guessModelType = ModelType.qwen;
+        if (fileName.toLowerCase().contains('deepseek')) guessModelType = ModelType.deepSeek;
+        
+        if (fileName.endsWith('.bin')) guessFileType = ModelFileType.binary;
+        if (fileName.endsWith('.litertlm')) guessFileType = ModelFileType.litertlm;
+
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const Center(
+            child: Card(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('正在加载本地模型...'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+
+        // 使用本地路径加载
+        await _modelManager.switchLocalModel(
+          path, 
+          modelType: guessModelType, 
+          fileType: guessFileType
+        );
+        
+        if (mounted) {
+          Navigator.pop(context);
+          setState(() {});
+          TopNotification.show(context, '已切换到本地模型 $fileName', type: NotificationType.success);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        TopNotification.show(context, '加载本地模型失败：$e', type: NotificationType.error);
+      }
+    }
   }
 
   Widget _buildCurrentModelCard() {
@@ -331,15 +459,13 @@ class _ModelListScreenState extends State<ModelListScreen> {
             const SizedBox(height: 10),
 
             // 大小 + 能力标签
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
               children: [
                 _buildTag(Icons.storage_rounded, model.size,
                     const Color(0xFF64748B)),
-                const SizedBox(width: 8),
-                ...model.capabilities.map((cap) => Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: _buildCapTag(cap),
-                    )),
+                ...model.capabilities.map((cap) => _buildCapTag(cap)),
               ],
             ),
 
@@ -590,6 +716,7 @@ class _ModelListScreenState extends State<ModelListScreen> {
   }
 
   void _cancelDownload(String modelId) {
+    _modelManager.cancelDownload(modelId);
     _downloadSubs[modelId]?.cancel();
     _downloadSubs.remove(modelId);
     setState(() {

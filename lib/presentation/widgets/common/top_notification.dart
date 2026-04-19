@@ -20,7 +20,6 @@ class TopNotification {
         icon = Icons.error_outline_rounded;
         break;
       case NotificationType.info:
-      default:
         backgroundColor = const Color(0xFF3B82F6);
         icon = Icons.info_outline_rounded;
         break;

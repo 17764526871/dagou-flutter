@@ -408,16 +408,19 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!_scrollController.hasClients) return;
     if (!force && _userScrolledUp) return;
 
-    // 使用多次 postFrameCallback 确保布局完成后滚动到真正的底部
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    void scroll() {
       if (!mounted || !_scrollController.hasClients) return;
 
-      if (force) {
-        // 强制滚动：先 jumpTo 再 animateTo，确保到达真正底部
-        final maxExtent = _scrollController.position.maxScrollExtent;
-        _scrollController.jumpTo(maxExtent);
+      final maxExtent = _scrollController.position.maxScrollExtent;
 
-        // 再次检查并动画滚动（处理布局延迟）
+      if (force) {
+        _scrollController.animateTo(
+          maxExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+
+        // 处理可能的布局延迟
         Future.delayed(const Duration(milliseconds: 50), () {
           if (!mounted || !_scrollController.hasClients) return;
           final newMax = _scrollController.position.maxScrollExtent;
@@ -431,10 +434,16 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       } else {
         // 流式输出时用 jumpTo 避免动画堆积导致卡顿
-        final maxExtent = _scrollController.position.maxScrollExtent;
         _scrollController.jumpTo(maxExtent);
       }
-    });
+    }
+
+    // 强制滚动直接执行，以避免 idle 时没有下一帧的问题
+    if (force) {
+      scroll();
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) => scroll());
+    }
   }
 
   void _showError(String message) {
