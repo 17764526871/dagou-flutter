@@ -8,6 +8,7 @@ import '../../../services/ai/ai_service.dart';
 import '../../../services/storage/settings_service.dart';
 import '../../widgets/chat/message_bubble.dart';
 import '../../widgets/chat/input_bar.dart';
+import '../../widgets/common/top_notification.dart';
 import '../settings/settings_screen.dart';
 import '../translate/translate_screen.dart';
 import '../models/model_list_screen.dart';
@@ -280,6 +281,9 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _cancelSending() async {
+    // 停止底层模型生成
+    await AIService.instance.stopGeneration();
+
     // 先取消流订阅
     await _streamSubscription?.cancel();
     _streamSubscription = null;
@@ -305,8 +309,8 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     });
 
-    // 立即重置会话，确保旧的生成器完全停止
-    await AIService.instance.resetSession();
+    // 清空对话历史，确保下次重新开始
+    await AIService.instance.clearHistory();
   }
 
   Future<void> _resendMessage(Message userMsg) async {
@@ -322,10 +326,14 @@ class _ChatScreenState extends State<ChatScreen> {
     // 重发前清除历史，确保全新上下文
     await AIService.instance.clearHistory();
 
-    await _sendMessage(
-      text: userMsg.text,
-      imageBytes: userMsg.mediaBytes,
-    );
+    if (userMsg.type == MessageType.audio && userMsg.mediaPath != null) {
+      await _handleVoiceRecorded(userMsg.mediaPath!, userMsg.audioDuration ?? 0);
+    } else {
+      await _sendMessage(
+        text: userMsg.text,
+        imageBytes: userMsg.mediaBytes,
+      );
+    }
   }
 
   Future<void> _handleVoiceRecorded(String voicePath, int duration) async {
@@ -430,15 +438,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red.shade400,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+    TopNotification.show(context, message, type: NotificationType.error);
   }
 
   Future<void> _openSettings() async {

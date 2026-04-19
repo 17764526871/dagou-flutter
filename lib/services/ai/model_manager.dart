@@ -18,7 +18,7 @@ class ModelManager {
   String? _currentModelId;
   PreferredBackend _currentBackend = PreferredBackend.gpu;
 
-  // 支持的模型列表（扩展更多模型）
+  // 支持的模型列表（扩展更多模型，真实HuggingFace地址）
   static const List<AIModelInfo> availableModels = [
     AIModelInfo(
       id: 'gemma-4-e2b',
@@ -30,49 +30,36 @@ class ModelManager {
       localPath: 'assets/models/gemma-4-E2B-it.litertlm',
     ),
     AIModelInfo(
-      id: 'gemma-3n-e2b',
-      name: 'Gemma 3n E2B',
-      size: '2.0GB',
-      capabilities: ['text', 'image', 'audio'],
-      url:
-          'https://huggingface.co/litert-community/Gemma-3n-E2B-it-litert-lm/resolve/main/gemma-3n-E2B-it.litertlm',
-      description: '多模态轻量模型（文本+图片+音频）',
-    ),
-    AIModelInfo(
-      id: 'gemma-3-1b',
-      name: 'Gemma 3 1B',
-      size: '0.8GB',
+      id: 'gemma-2-2b-it-cpu',
+      name: 'Gemma 2 2B IT (CPU)',
+      size: '1.4GB',
       capabilities: ['text'],
-      url:
-          'https://huggingface.co/litert-community/Gemma-3-1B-IT-int4/resolve/main/gemma3-1b-it-int4.task',
-      description: '超轻量纯文本模型，速度最快',
+      url: 'https://huggingface.co/bensonruan/gemma-2-2b-it-cpu-int4/resolve/main/gemma-2-2b-it-cpu-int4.bin?download=true',
+      description: '适合CPU运行的纯文本模型，速度较快，兼容性强',
     ),
     AIModelInfo(
-      id: 'gemma-3-4b',
-      name: 'Gemma 3 4B',
-      size: '2.6GB',
-      capabilities: ['text', 'image'],
-      url:
-          'https://huggingface.co/litert-community/Gemma-3-4B-IT-int4/resolve/main/gemma3-4b-it-int4.task',
-      description: '中等规模视觉语言模型',
-    ),
-    AIModelInfo(
-      id: 'gemma-2-2b',
-      name: 'Gemma 2 2B',
-      size: '1.5GB',
+      id: 'gemma-2-2b-it-gpu',
+      name: 'Gemma 2 2B IT (GPU)',
+      size: '1.4GB',
       capabilities: ['text'],
-      url:
-          'https://huggingface.co/litert-community/gemma-2b-it-gpu-int4/resolve/main/gemma-2b-it-gpu-int4.bin',
-      description: '轻量级纯文本模型',
+      url: 'https://huggingface.co/bensonruan/gemma-2-2b-it-gpu-int4/resolve/main/gemma-2-2b-it-gpu-int4.bin?download=true',
+      description: '适合高端设备GPU运行的纯文本模型，速度最快',
     ),
     AIModelInfo(
-      id: 'gemma-2-9b',
-      name: 'Gemma 2 9B',
-      size: '5.4GB',
+      id: 'gemma-2b-it-cpu',
+      name: 'Gemma 1.1 2B IT (CPU)',
+      size: '1.3GB',
       capabilities: ['text'],
-      url:
-          'https://huggingface.co/litert-community/gemma-2-9b-it-gpu-int4/resolve/main/gemma-2-9b-it-gpu-int4.bin',
-      description: '高性能文本模型（需要高端设备）',
+      url: 'https://huggingface.co/bensonruan/gemma-2b-it-cpu-int4/resolve/main/gemma-2b-it-cpu-int4.bin?download=true',
+      description: '第一代轻量级文本模型，资源占用极小',
+    ),
+    AIModelInfo(
+      id: 'gemma-2b-it-gpu',
+      name: 'Gemma 1.1 2B IT (GPU)',
+      size: '1.3GB',
+      capabilities: ['text'],
+      url: 'https://huggingface.co/bensonruan/gemma-2b-it-gpu-int4/resolve/main/gemma-2b-it-gpu-int4.bin?download=true',
+      description: '第一代GPU加速文本模型，适合老旧设备',
     ),
   ];
 
@@ -111,6 +98,12 @@ class ModelManager {
             final progress = received / total;
             controller.add(progress);
             debugPrint('📥 下载进度: ${(progress * 100).toStringAsFixed(1)}%');
+          } else {
+            // 如果服务端不返回总大小，我们用2GB(2147483648 bytes)作为估算
+            const estimatedTotal = 2147483648.0;
+            final progress = (received / estimatedTotal).clamp(0.0, 0.99);
+            controller.add(progress);
+            debugPrint('📥 下载已接收: ${(received / 1024 / 1024).toStringAsFixed(1)} MB');
           }
         },
         options: Options(

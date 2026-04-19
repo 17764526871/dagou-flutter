@@ -3,6 +3,7 @@ import 'package:flutter_gemma/flutter_gemma.dart';
 import '../../../services/storage/settings_service.dart';
 import '../../../services/storage/cache_service.dart';
 import '../../../services/ai/model_manager.dart';
+import '../../widgets/common/top_notification.dart';
 import '../models/model_list_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -85,16 +86,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showSnack(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor:
-            isError ? const Color(0xFFEF4444) : const Color(0xFF10B981),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
+    TopNotification.show(
+      context,
+      message,
+      type: isError ? NotificationType.error : NotificationType.success,
     );
   }
 

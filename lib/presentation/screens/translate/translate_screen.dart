@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../widgets/common/top_notification.dart';
 import 'dart:async';
 import '../../../services/ai/ai_service.dart';
 
@@ -158,15 +159,10 @@ class _TranslateScreenState extends State<TranslateScreen>
   void _copyOutput() {
     if (_outputText.isEmpty) return;
     Clipboard.setData(ClipboardData(text: _outputText));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('已复制翻译结果'),
-        duration: const Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        backgroundColor: const Color(0xFF10B981),
-      ),
+    TopNotification.show(
+      context,
+      '已复制翻译结果',
+      type: NotificationType.success,
     );
   }
 
@@ -597,13 +593,9 @@ class _TranslateScreenState extends State<TranslateScreen>
 
   void _showHistory() {
     if (_history.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('暂无翻译历史'),
-          behavior: SnackBarBehavior.floating,
-          margin: EdgeInsets.only(top: 60, left: 16, right: 16),
-          backgroundColor: Color(0xFF64748B),
-        ),
+      TopNotification.show(
+        context,
+        '暂无翻译历史',
       );
       return;
     }

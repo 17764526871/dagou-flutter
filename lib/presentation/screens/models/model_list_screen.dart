@@ -3,6 +3,7 @@ import 'package:flutter_gemma/flutter_gemma.dart';
 import 'dart:async';
 import '../../../services/ai/model_manager.dart';
 import '../../../data/models/ai_model_info.dart';
+import '../../widgets/common/top_notification.dart';
 
 class ModelListScreen extends StatefulWidget {
   const ModelListScreen({super.key});
@@ -539,30 +540,12 @@ class _ModelListScreenState extends State<ModelListScreen> {
       if (mounted) {
         Navigator.pop(context);
         setState(() {});
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('已切换到 ${model.name}'),
-            backgroundColor: const Color(0xFF10B981),
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10)),
-          ),
-        );
+        TopNotification.show(context, '已切换到 ${model.name}', type: NotificationType.success);
       }
     } catch (e) {
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('切换失败：$e'),
-            backgroundColor: const Color(0xFFEF4444),
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10)),
-          ),
-        );
+        TopNotification.show(context, '切换失败：$e', type: NotificationType.error);
       }
     }
   }
@@ -589,16 +572,7 @@ class _ModelListScreenState extends State<ModelListScreen> {
             _downloadProgress.remove(model.id);
           });
           _downloadSubs.remove(model.id);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${model.name} 下载完成'),
-              backgroundColor: const Color(0xFF10B981),
-              behavior: SnackBarBehavior.floating,
-              margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-          );
+          TopNotification.show(context, '${model.name} 下载完成', type: NotificationType.success);
         }
       },
       onError: (e) {
@@ -608,16 +582,7 @@ class _ModelListScreenState extends State<ModelListScreen> {
             _downloadProgress.remove(model.id);
           });
           _downloadSubs.remove(model.id);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('下载失败：$e'),
-              backgroundColor: const Color(0xFFEF4444),
-              behavior: SnackBarBehavior.floating,
-              margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-          );
+          TopNotification.show(context, '下载失败：$e', type: NotificationType.error);
         }
       },
     );

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import '../../../services/audio/audio_service.dart';
 
+import '../common/top_notification.dart';
+
 class InputBar extends StatefulWidget {
   final TextEditingController controller;
   final VoidCallback onSend;
@@ -85,14 +87,7 @@ class _InputBarState extends State<InputBar> with TickerProviderStateMixin {
     final success = await AudioService.instance.startRecording();
     if (!success) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('录音权限未授予'),
-            behavior: SnackBarBehavior.floating,
-            margin: EdgeInsets.only(top: 60, left: 16, right: 16),
-            backgroundColor: Color(0xFFEF4444),
-          ),
-        );
+        TopNotification.show(context, '录音权限未授予', type: NotificationType.error);
       }
       return;
     }
@@ -122,6 +117,9 @@ class _InputBarState extends State<InputBar> with TickerProviderStateMixin {
       }
     } else {
       await AudioService.instance.cancelRecording();
+      if (!_isCancelZone && mounted) {
+        TopNotification.show(context, '录音太短，已取消', type: NotificationType.info);
+      }
     }
 
     setState(() {

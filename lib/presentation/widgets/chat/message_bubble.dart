@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../common/top_notification.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../../data/models/message.dart';
 import 'audio_player_widget.dart';
@@ -274,16 +275,7 @@ class MessageBubble extends StatelessWidget {
   void _copyText(BuildContext context) {
     if (message.text.isEmpty) return;
     Clipboard.setData(ClipboardData(text: message.text));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('已复制到剪贴板'),
-        duration: const Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        backgroundColor: const Color(0xFF10B981),
-      ),
-    );
+    TopNotification.show(context, '已复制到剪贴板', type: NotificationType.success);
   }
 
   void _showCopyMenu(BuildContext context) {

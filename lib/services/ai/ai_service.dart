@@ -158,6 +158,18 @@ class AIService {
     }
   }
 
+  /// 停止生成
+  Future<void> stopGeneration() async {
+    if (_chat != null) {
+      try {
+        await _chat!.stopGeneration();
+        debugPrint('🛑 已停止模型生成');
+      } catch (e) {
+        debugPrint('⚠️ 停止生成时出错 (可能已停止): $e');
+      }
+    }
+  }
+
   /// 标记需要重置并立即重建会话（取消时调用）
   /// 立即重建确保旧的生成器完全停止
   Future<void> resetSession() async {
