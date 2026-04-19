@@ -543,7 +543,7 @@ class _ModelListScreenState extends State<ModelListScreen> {
           SnackBar(
             content: Text('已切换到 ${model.name}'),
             backgroundColor: const Color(0xFF10B981),
-            behavior: SnackBarBehavior.fixed,
+            behavior: SnackBarBehavior.floating,
             margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10)),
@@ -557,7 +557,7 @@ class _ModelListScreenState extends State<ModelListScreen> {
           SnackBar(
             content: Text('切换失败：$e'),
             backgroundColor: const Color(0xFFEF4444),
-            behavior: SnackBarBehavior.fixed,
+            behavior: SnackBarBehavior.floating,
             margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10)),
@@ -593,7 +593,7 @@ class _ModelListScreenState extends State<ModelListScreen> {
             SnackBar(
               content: Text('${model.name} 下载完成'),
               backgroundColor: const Color(0xFF10B981),
-              behavior: SnackBarBehavior.fixed,
+              behavior: SnackBarBehavior.floating,
               margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
@@ -612,7 +612,7 @@ class _ModelListScreenState extends State<ModelListScreen> {
             SnackBar(
               content: Text('下载失败：$e'),
               backgroundColor: const Color(0xFFEF4444),
-              behavior: SnackBarBehavior.fixed,
+              behavior: SnackBarBehavior.floating,
               margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),

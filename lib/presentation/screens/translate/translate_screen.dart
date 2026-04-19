@@ -162,7 +162,7 @@ class _TranslateScreenState extends State<TranslateScreen>
       SnackBar(
         content: const Text('已复制翻译结果'),
         duration: const Duration(seconds: 1),
-        behavior: SnackBarBehavior.fixed,
+        behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         backgroundColor: const Color(0xFF10B981),
@@ -600,7 +600,7 @@ class _TranslateScreenState extends State<TranslateScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('暂无翻译历史'),
-          behavior: SnackBarBehavior.fixed,
+          behavior: SnackBarBehavior.floating,
           margin: EdgeInsets.only(top: 60, left: 16, right: 16),
           backgroundColor: Color(0xFF64748B),
         ),

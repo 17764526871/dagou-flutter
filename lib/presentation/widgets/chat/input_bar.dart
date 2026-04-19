@@ -88,7 +88,7 @@ class _InputBarState extends State<InputBar> with TickerProviderStateMixin {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('录音权限未授予'),
-            behavior: SnackBarBehavior.fixed,
+            behavior: SnackBarBehavior.floating,
             margin: EdgeInsets.only(top: 60, left: 16, right: 16),
             backgroundColor: Color(0xFFEF4444),
           ),

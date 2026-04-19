@@ -278,7 +278,7 @@ class MessageBubble extends StatelessWidget {
       SnackBar(
         content: const Text('已复制到剪贴板'),
         duration: const Duration(seconds: 1),
-        behavior: SnackBarBehavior.fixed,
+        behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         backgroundColor: const Color(0xFF10B981),

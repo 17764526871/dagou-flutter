@@ -434,7 +434,7 @@ class _ChatScreenState extends State<ChatScreen> {
       SnackBar(
         content: Text(message),
         backgroundColor: Colors.red.shade400,
-        behavior: SnackBarBehavior.fixed,
+        behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.only(top: 60, left: 16, right: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
