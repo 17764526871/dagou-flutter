@@ -7,7 +7,7 @@ DEVICE_ID ?= 6150eeda
 APK_RELEASE = build/app/outputs/flutter-apk/app-release.apk
 APK_DEBUG   = build/app/outputs/flutter-apk/app-debug.apk
 
-.PHONY: help run run-release build build-debug install install-debug \
+.PHONY: help run run-release build build-debug build-ios install install-debug \
         analyze format clean pub upgrade download-model
 
 help:
@@ -18,6 +18,7 @@ help:
 	@echo "  make run-release    Release 模式运行（推荐，性能更好）"
 	@echo "  make build          构建 Release APK"
 	@echo "  make build-debug    构建 Debug APK"
+	@echo "  make build-ios      构建 iOS IPA（需要 macOS）"
 	@echo "  make install        构建 Release APK 并安装到设备"
 	@echo "  make install-debug  构建 Debug APK 并安装到设备"
 	@echo "  make analyze        代码静态分析"
@@ -45,6 +46,9 @@ build:
 
 build-debug:
 	flutter build apk --debug
+
+build-ios:
+	flutter build ios --release --no-codesign
 
 # ── 安装 ──────────────────────────────────────────────────────────────────────
 
