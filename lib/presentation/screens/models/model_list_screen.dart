@@ -3,6 +3,8 @@ import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:async';
 import '../../../services/ai/model_manager.dart';
+import '../../../services/network/model_download_service.dart';
+import '../../../services/storage/settings_service.dart';
 import '../../../data/models/ai_model_info.dart';
 import '../../widgets/common/top_notification.dart';
 
@@ -15,18 +17,68 @@ class ModelListScreen extends StatefulWidget {
 
 class _ModelListScreenState extends State<ModelListScreen> {
   final ModelManager _modelManager = ModelManager.instance;
+  final ModelDownloadService _downloadService = ModelDownloadService.instance;
+  final SettingsService _settingsService = SettingsService.instance;
+  final TextEditingController _serverUrlController = TextEditingController();
 
-  // 下载进度追踪 modelId -> progress(0.0~1.0)
-  final Map<String, double> _downloadProgress = {};
-  final Map<String, bool> _isDownloading = {};
-  final Map<String, StreamSubscription<double>> _downloadSubs = {};
+  // 服务器模型列表
+  List<Map<String, dynamic>> _serverModels = [];
+  bool _loadingServerModels = false;
+  String? _serverError;
+
+  @override
+  void initState() {
+    super.initState();
+    _serverUrlController.text = _settingsService.loadModelServerUrl();
+    if (_serverUrlController.text.isNotEmpty) {
+      _fetchServerModels();
+    }
+  }
 
   @override
   void dispose() {
-    for (final sub in _downloadSubs.values) {
-      sub.cancel();
-    }
+    _serverUrlController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchServerModels() async {
+    if (_serverUrlController.text.trim().isEmpty) {
+      setState(() {
+        _serverError = '请输入服务器地址';
+      });
+      return;
+    }
+
+    setState(() {
+      _loadingServerModels = true;
+      _serverError = null;
+    });
+
+    try {
+      final models = await _downloadService.fetchServerModels(_serverUrlController.text);
+      setState(() {
+        _serverModels = models;
+        _loadingServerModels = false;
+      });
+
+      // 保存服务器地址
+      await _settingsService.saveModelServerUrl(_serverUrlController.text);
+
+      if (mounted) {
+        TopNotification.show(context, '已连接到服务器，找到 ${models.length} 个模型',
+          type: NotificationType.success);
+      }
+    } catch (e) {
+      setState(() {
+        _loadingServerModels = false;
+        _serverError = '连接失败：$e';
+      });
+
+      if (mounted) {
+        TopNotification.show(context, '连接服务器失败：$e',
+          type: NotificationType.error);
+      }
+    }
   }
 
   @override
@@ -54,8 +106,33 @@ class _ModelListScreenState extends State<ModelListScreen> {
         children: [
           _buildCurrentModelCard(),
           const SizedBox(height: 16),
+
+          // 服务器设置
+          _buildServerSettingsCard(),
+          const SizedBox(height: 16),
+
+          // 服务器模型列表
+          if (_serverModels.isNotEmpty) ...[
+            const Text(
+              '局域网可下载模型',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF64748B),
+              ),
+            ),
+            const SizedBox(height: 10),
+            ..._serverModels.map((m) => _buildServerModelCard(m)),
+            const SizedBox(height: 16),
+          ],
+
+          // 本地文件选择
+          _buildLocalFileCard(),
+          const SizedBox(height: 16),
+
+          // 内置模型列表
           const Text(
-            '全部模型',
+            '内置模型',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
@@ -64,10 +141,6 @@ class _ModelListScreenState extends State<ModelListScreen> {
           ),
           const SizedBox(height: 10),
           ...ModelManager.availableModels.map((m) => _buildModelCard(m)),
-          
-          // 从本地文件选择模型
-          const SizedBox(height: 10),
-          _buildLocalFileCard(),
 
           const SizedBox(height: 20),
           // 说明
@@ -86,7 +159,7 @@ class _ModelListScreenState extends State<ModelListScreen> {
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '下载模型需要稳定的网络连接，文件较大（1~3GB），建议在 WiFi 环境下下载。下载完成后可离线使用。',
+                    '• 局域网下载：在电脑上运行 model_server.js，手机连接同一WiFi即可下载\n• 本地文件：从手机存储选择已下载的模型文件\n• 模型保存在外部存储，卸载应用不会丢失',
                     style: TextStyle(
                         fontSize: 12,
                         color: Color(0xFF92400E),
@@ -99,6 +172,216 @@ class _ModelListScreenState extends State<ModelListScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildServerSettingsCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.cloud_download_rounded,
+                  color: Color(0xFF0EA5E9), size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                '局域网服务器',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _serverUrlController,
+            decoration: InputDecoration(
+              hintText: '例如: 192.168.1.100:8080',
+              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+              filled: true,
+              fillColor: const Color(0xFFF8FAFC),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFF0EA5E9), width: 2),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+            style: const TextStyle(fontSize: 14),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _loadingServerModels ? null : _fetchServerModels,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0EA5E9),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+              ),
+              child: _loadingServerModels
+                  ? const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text('连接服务器',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            ),
+          ),
+          if (_serverError != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _serverError!,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServerModelCard(Map<String, dynamic> model) {
+    final String name = model['name'] ?? '';
+    final String size = model['size'] ?? '';
+    final String url = model['url'] ?? '';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0F9FF),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.cloud_outlined, color: Color(0xFF0EA5E9), size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    size,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                  ),
+                ],
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => _downloadFromServer(name, url),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+              ),
+              child: const Text('下载', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _downloadFromServer(String fileName, String url) async {
+    try {
+      // 构建完整URL
+      String serverUrl = _serverUrlController.text.trim();
+      if (!serverUrl.startsWith('http://') && !serverUrl.startsWith('https://')) {
+        serverUrl = 'http://$serverUrl';
+      }
+      if (!serverUrl.endsWith('/')) {
+        serverUrl = '$serverUrl/';
+      }
+
+      final fullUrl = '$serverUrl${url.startsWith('/') ? url.substring(1) : url}';
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text('正在下载 $fileName...'),
+            ],
+          ),
+        ),
+      );
+
+      final stream = _downloadService.downloadFromLAN(
+        modelId: fileName,
+        lanUrl: fullUrl,
+        fileName: fileName,
+      );
+
+      await for (final progress in stream) {
+        // 更新进度
+        debugPrint('下载进度: ${(progress * 100).toStringAsFixed(1)}%');
+      }
+
+      if (mounted) {
+        Navigator.pop(context);
+        TopNotification.show(context, '模型下载完成：$fileName',
+          type: NotificationType.success);
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        TopNotification.show(context, '下载失败：$e',
+          type: NotificationType.error);
+      }
+    }
   }
 
   Widget _buildLocalFileCard() {
@@ -123,10 +406,10 @@ class _ModelListScreenState extends State<ModelListScreen> {
               child: const Icon(Icons.folder_open_rounded, color: Color(0xFF64748B), size: 22),
             ),
             const SizedBox(width: 12),
-            Expanded(
+            const Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
+                children: [
                   Text(
                     '从本地文件夹选择模型',
                     style: TextStyle(
@@ -170,15 +453,15 @@ class _ModelListScreenState extends State<ModelListScreen> {
       if (result != null && result.files.single.path != null) {
         String path = result.files.single.path!;
         String fileName = result.files.single.name;
-        
+
         // 猜测模型类型
         ModelType guessModelType = ModelType.general;
         ModelFileType guessFileType = ModelFileType.task;
-        
+
         if (fileName.toLowerCase().contains('gemma')) guessModelType = ModelType.gemmaIt;
         if (fileName.toLowerCase().contains('qwen')) guessModelType = ModelType.qwen;
         if (fileName.toLowerCase().contains('deepseek')) guessModelType = ModelType.deepSeek;
-        
+
         if (fileName.endsWith('.bin')) guessFileType = ModelFileType.binary;
         if (fileName.endsWith('.litertlm')) guessFileType = ModelFileType.litertlm;
 
@@ -204,11 +487,11 @@ class _ModelListScreenState extends State<ModelListScreen> {
 
         // 使用本地路径加载
         await _modelManager.switchLocalModel(
-          path, 
-          modelType: guessModelType, 
+          path,
+          modelType: guessModelType,
           fileType: guessFileType
         );
-        
+
         if (mounted) {
           Navigator.pop(context);
           setState(() {});
@@ -297,36 +580,25 @@ class _ModelListScreenState extends State<ModelListScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          const Divider(color: Colors.white24, height: 1),
           const SizedBox(height: 12),
           Wrap(
-            spacing: 8,
+            spacing: 6,
             runSpacing: 6,
-            children: current.capabilities.map((cap) {
-              return Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(_capIcon(cap), color: Colors.white, size: 13),
-                    const SizedBox(width: 4),
-                    Text(
-                      _capLabel(cap),
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
+            children: current.capabilities
+                .map((cap) => Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        _getCapabilityLabel(cap),
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 11),
+                      ),
+                    ))
+                .toList(),
           ),
         ],
       ),
@@ -334,50 +606,34 @@ class _ModelListScreenState extends State<ModelListScreen> {
   }
 
   Widget _buildModelCard(AIModelInfo model) {
-    final isCurrent = _modelManager.currentModelId == model.id;
-    final isDownloading = _isDownloading[model.id] == true;
-    final progress = _downloadProgress[model.id] ?? 0.0;
-
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: isCurrent
-            ? Border.all(color: const Color(0xFF0EA5E9), width: 1.5)
-            : null,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 头部：图标 + 名称 + 状态
             Row(
               children: [
                 Container(
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: isCurrent
-                        ? const Color(0xFF0EA5E9).withValues(alpha: 0.1)
-                        : const Color(0xFFF1F5F9),
+                    color: model.isBuiltIn
+                        ? const Color(0xFFF0F9FF)
+                        : const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
-                    model.isBuiltIn
-                        ? Icons.phone_android_rounded
-                        : Icons.cloud_download_rounded,
-                    color: isCurrent
+                    model.isBuiltIn ? Icons.star_rounded : Icons.cloud_outlined,
+                    color: model.isBuiltIn
                         ? const Color(0xFF0EA5E9)
-                        : const Color(0xFF94A3B8),
+                        : const Color(0xFF64748B),
                     size: 22,
                   ),
                 ),
@@ -386,67 +642,17 @@ class _ModelListScreenState extends State<ModelListScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              model.name,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1E293B),
-                              ),
-                            ),
-                          ),
-                          if (isCurrent)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF0EA5E9),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Text('使用中',
-                                  style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600)),
-                            )
-                          else if (model.isBuiltIn)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF10B981)
-                                    .withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Text('已安装',
-                                  style: TextStyle(
-                                      color: Color(0xFF10B981),
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600)),
-                            )
-                          else
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF59E0B)
-                                    .withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Text('可下载',
-                                  style: TextStyle(
-                                      color: Color(0xFFF59E0B),
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600)),
-                            ),
-                        ],
+                      Text(
+                        model.name,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
+                        ),
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        model.description,
+                        model.size,
                         style: const TextStyle(
                             fontSize: 12, color: Color(0xFF94A3B8)),
                       ),
@@ -455,273 +661,50 @@ class _ModelListScreenState extends State<ModelListScreen> {
                 ),
               ],
             ),
-
             const SizedBox(height: 10),
-
-            // 大小 + 能力标签
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                _buildTag(Icons.storage_rounded, model.size,
-                    const Color(0xFF64748B)),
-                ...model.capabilities.map((cap) => _buildCapTag(cap)),
-              ],
+            Text(
+              model.description,
+              style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF64748B),
+                  height: 1.4),
             ),
-
-            // 下载进度条
-            if (isDownloading) ...[
-              const SizedBox(height: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '下载中 ${(progress * 100).toStringAsFixed(1)}%',
-                        style: const TextStyle(
-                            fontSize: 12, color: Color(0xFF0EA5E9)),
-                      ),
-                      GestureDetector(
-                        onTap: () => _cancelDownload(model.id),
-                        child: const Text('取消',
-                            style: TextStyle(
-                                fontSize: 12, color: Color(0xFFEF4444))),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      backgroundColor: const Color(0xFFE2E8F0),
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                          Color(0xFF0EA5E9)),
-                      minHeight: 6,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-
-            // 操作按钮
-            if (!isCurrent && !isDownloading) ...[
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: model.isBuiltIn
-                    ? ElevatedButton(
-                        onPressed: () => _switchModel(model),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0EA5E9),
-                          foregroundColor: Colors.white,
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 10),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                          elevation: 0,
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: model.capabilities
+                  .map((cap) => Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0F9FF),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                              color: const Color(0xFFBAE6FD)),
                         ),
-                        child: const Text('切换使用',
-                            style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600)),
-                      )
-                    : OutlinedButton.icon(
-                        onPressed: model.url != null
-                            ? () => _startDownload(model)
-                            : null,
-                        icon: const Icon(Icons.download_rounded, size: 16),
-                        label: const Text('下载模型',
-                            style: TextStyle(fontSize: 14)),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF0EA5E9),
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 10),
-                          side: const BorderSide(
-                              color: Color(0xFF0EA5E9)),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
+                        child: Text(
+                          _getCapabilityLabel(cap),
+                          style: const TextStyle(
+                              color: Color(0xFF0369A1), fontSize: 11),
                         ),
-                      ),
-              ),
-            ],
+                      ))
+                  .toList(),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTag(IconData icon, String text, Color color) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 13, color: color),
-        const SizedBox(width: 3),
-        Text(text,
-            style: TextStyle(
-                fontSize: 12, color: color, fontWeight: FontWeight.w500)),
-      ],
-    );
-  }
-
-  Widget _buildCapTag(String cap) {
-    final color = _capColor(cap);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(_capIcon(cap), size: 11, color: color),
-          const SizedBox(width: 3),
-          Text(
-            _capLabel(cap),
-            style: TextStyle(
-                fontSize: 11, color: color, fontWeight: FontWeight.w500),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Color _capColor(String cap) {
-    switch (cap) {
-      case 'text':
-        return const Color(0xFF0EA5E9);
-      case 'image':
-        return const Color(0xFF8B5CF6);
-      case 'audio':
-        return const Color(0xFF10B981);
-      case 'function_calling':
-        return const Color(0xFFF59E0B);
-      case 'thinking':
-        return const Color(0xFFEF4444);
-      default:
-        return const Color(0xFF64748B);
-    }
-  }
-
-  IconData _capIcon(String cap) {
-    switch (cap) {
-      case 'text':
-        return Icons.text_fields_rounded;
-      case 'image':
-        return Icons.image_rounded;
-      case 'audio':
-        return Icons.mic_rounded;
-      case 'function_calling':
-        return Icons.functions_rounded;
-      case 'thinking':
-        return Icons.psychology_rounded;
-      default:
-        return Icons.star_rounded;
-    }
-  }
-
-  String _capLabel(String cap) {
-    switch (cap) {
-      case 'text':
-        return '文本';
-      case 'image':
-        return '图片';
-      case 'audio':
-        return '音频';
-      case 'function_calling':
-        return '函数调用';
-      case 'thinking':
-        return '深度思考';
-      default:
-        return cap;
-    }
-  }
-
-  Future<void> _switchModel(AIModelInfo model) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(
-        child: Card(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text('正在切换模型...'),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-
-    try {
-      await _modelManager.switchModel(model.id);
-      if (mounted) {
-        Navigator.pop(context);
-        setState(() {});
-        TopNotification.show(context, '已切换到 ${model.name}', type: NotificationType.success);
-      }
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context);
-        TopNotification.show(context, '切换失败：$e', type: NotificationType.error);
-      }
-    }
-  }
-
-  void _startDownload(AIModelInfo model) {
-    if (model.url == null) return;
-
-    setState(() {
-      _isDownloading[model.id] = true;
-      _downloadProgress[model.id] = 0.0;
-    });
-
-    final stream = _modelManager.downloadModel(model.id, model.url!);
-    final sub = stream.listen(
-      (progress) {
-        if (mounted) {
-          setState(() => _downloadProgress[model.id] = progress);
-        }
-      },
-      onDone: () {
-        if (mounted) {
-          setState(() {
-            _isDownloading[model.id] = false;
-            _downloadProgress.remove(model.id);
-          });
-          _downloadSubs.remove(model.id);
-          TopNotification.show(context, '${model.name} 下载完成', type: NotificationType.success);
-        }
-      },
-      onError: (e) {
-        if (mounted) {
-          setState(() {
-            _isDownloading[model.id] = false;
-            _downloadProgress.remove(model.id);
-          });
-          _downloadSubs.remove(model.id);
-          TopNotification.show(context, '下载失败：$e', type: NotificationType.error);
-        }
-      },
-    );
-    _downloadSubs[model.id] = sub;
-  }
-
-  void _cancelDownload(String modelId) {
-    _modelManager.cancelDownload(modelId);
-    _downloadSubs[modelId]?.cancel();
-    _downloadSubs.remove(modelId);
-    setState(() {
-      _isDownloading[modelId] = false;
-      _downloadProgress.remove(modelId);
-    });
+  String _getCapabilityLabel(String cap) {
+    const labels = {
+      'text': '文本',
+      'image': '图片',
+      'audio': '音频',
+      'function_calling': '函数调用',
+      'thinking': '思维链',
+    };
+    return labels[cap] ?? cap;
   }
 }

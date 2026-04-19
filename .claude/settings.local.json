@@ -3,7 +3,10 @@
     "allow": [
       "Bash(python check_repos.py)",
       "Bash(grep -E \"\\\\.\\(task|litertlm\\)$\")",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(node model_server.js)",
+      "Bash(curl -s http://localhost:8080/api/models)"
     ],
     "additionalDirectories": [
       "U:\\DG model",

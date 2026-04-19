@@ -95,6 +95,15 @@ class SettingsService {
     };
   }
 
+  // 模型服务器地址
+  Future<void> saveModelServerUrl(String url) async {
+    await _prefs?.setString('model_server_url', url);
+  }
+
+  String loadModelServerUrl() {
+    return _prefs?.getString('model_server_url') ?? '';
+  }
+
   // 清除所有设置
   Future<void> clearAllSettings() async {
     await _prefs?.clear();

@@ -19,6 +19,38 @@ class ModelDownloadService {
 
   final Map<String, CancelToken> _cancelTokens = {};
 
+  /// 获取服务器上的模型列表
+  Future<List<Map<String, dynamic>>> fetchServerModels(String serverUrl) async {
+    try {
+      // 确保URL格式正确
+      String url = serverUrl.trim();
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'http://$url';
+      }
+      if (!url.endsWith('/')) {
+        url = '$url/';
+      }
+
+      final response = await _dio.get(
+        '${url}api/models',
+        options: Options(
+          receiveTimeout: const Duration(seconds: 10),
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data as Map<String, dynamic>;
+        final models = data['models'] as List<dynamic>;
+        return models.cast<Map<String, dynamic>>();
+      }
+
+      return [];
+    } catch (e) {
+      debugPrint('❌ 获取服务器模型列表失败: $e');
+      rethrow;
+    }
+  }
+
   /// 从局域网下载模型
   Stream<double> downloadFromLAN({
     required String modelId,
